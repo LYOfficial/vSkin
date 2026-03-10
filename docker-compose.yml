@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: skin-backend/Dockerfile
+      network: host
+      args:
+        - VITE_BASE_PATH=${VITE_BASE_PATH:-/}
+        - VITE_API_BASE=${VITE_API_BASE:-/skinapi}
+        - BUILD_MODE=${BUILD_MODE:-standard}
+    container_name: vskin
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/data
+    environment:
+      - SERVER__ROOT_PATH=${SERVER__ROOT_PATH:-/skinapi}

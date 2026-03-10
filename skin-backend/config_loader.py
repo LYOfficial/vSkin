@@ -1,0 +1,133 @@
+"""
+配置文件加载器
+支持 YAML 配置文件，并提供环境变量覆盖
+"""
+
+import os
+import yaml
+from typing import Any, Dict
+
+
+class Config:
+    def __init__(self, config_path: str = "config.yaml"):
+        self.config_path = config_path
+        self._data = {}
+        self.load()
+
+    def load(self):
+        """加载配置文件"""
+        if os.path.exists(self.config_path):
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                self._data = yaml.safe_load(f) or {}
+        else:
+            print(f"Warning: Config file {self.config_path} not found, using defaults")
+            self._data = self._get_defaults()
+        self._normalize_fallbacks()
+
+    def _normalize_fallbacks(self):
+        """确保 fallback 与 mojang 配置兼容"""
+        fallbacks = self._data.get("fallbacks")
+        mojang = self._data.get("mojang")
+
+        if not fallbacks:
+            if not mojang:
+                mojang = self._get_defaults().get("mojang", {})
+                self._data["mojang"] = mojang
+            self._data["fallbacks"] = [
+                {
+                    "name": mojang.get("name", "mojang"),
+                    "session_url": mojang.get("session_url"),
+                    "account_url": mojang.get("account_url"),
+                    "services_url": mojang.get("services_url"),
+                    "skin_domains": mojang.get("skin_domains", []),
+                    "cache_ttl": mojang.get("cache_ttl", 60),
+                }
+            ]
+        else:
+            # 兼容旧逻辑：确保每个服务都有 name，并回填 mojang
+            for idx, entry in enumerate(fallbacks):
+                if "name" not in entry or not entry.get("name"):
+                    entry["name"] = f"fallback_{idx + 1}"
+            if not mojang and fallbacks:
+                primary = fallbacks[0]
+                self._data["mojang"] = {
+                    "session_url": primary.get("session_url"),
+                    "account_url": primary.get("account_url"),
+                    "services_url": primary.get("services_url"),
+                    "skin_domains": primary.get("skin_domains", []),
+                    "cache_ttl": primary.get("cache_ttl", 60),
+                }
+
+    def _get_defaults(self) -> Dict[str, Any]:
+        """默认配置"""
+        return {
+            "jwt": {
+                "secret": "dev-secret-please-change-in-production",
+                "expire_days": 7,
+            },
+            "rate_limit": {
+                "enabled": True,
+                "auth_attempts": 5,
+                "auth_window_minutes": 15,
+                "general_requests": 100,
+                "general_window_seconds": 60,
+            },
+            "database": {"path": "yggdrasil.db", "max_connections": 10},
+            "textures": {"directory": "textures", "max_size_kb": 1024},
+            "mojang": {
+                "session_url": "https://sessionserver.mojang.com",
+                "account_url": "https://api.mojang.com",
+                "services_url": "https://api.minecraftservices.com",
+                "skin_domains": ["textures.minecraft.net"],
+                "cache_ttl": 60,
+            },
+            "fallbacks": [
+                {
+                    "name": "mojang",
+                    "session_url": "https://sessionserver.mojang.com",
+                    "account_url": "https://api.mojang.com",
+                    "services_url": "https://api.minecraftservices.com",
+                    "skin_domains": ["textures.minecraft.net"],
+                    "cache_ttl": 60,
+                }
+            ],
+            "server": {"host": "0.0.0.0", "port": 8000, "debug": False},
+        }
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """
+        获取配置值，支持点号分隔的嵌套键
+        例如: config.get('jwt.secret')
+        环境变量优先级更高，格式：KEY__SUBKEY（双下划线）
+        例如: JWT__SECRET 会覆盖 jwt.secret
+        """
+        # 检查环境变量（转换为大写，点号改为双下划线）
+        env_key = key.upper().replace(".", "__")
+        env_value = os.getenv(env_key)
+        if env_value is not None:
+            # 尝试转换类型
+            if env_value.lower() in ("true", "false"):
+                return env_value.lower() == "true"
+            try:
+                return int(env_value)
+            except ValueError:
+                try:
+                    return float(env_value)
+                except ValueError:
+                    return env_value
+
+        # 从配置文件读取
+        keys = key.split(".")
+        value = self._data
+        for k in keys:
+            if isinstance(value, dict):
+                value = value.get(k)
+            else:
+                return default
+            if value is None:
+                return default
+        return value if value is not None else default
+
+
+# 全局配置实例
+config = Config()
