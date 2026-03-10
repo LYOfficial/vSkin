@@ -2,10 +2,10 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /frontend
 
-COPY element-skin/package*.json ./
+COPY vskin/package*.json ./
 RUN npm install
 
-COPY element-skin/ ./
+COPY vskin/ ./
 
 ARG VITE_BASE_PATH=/
 ARG VITE_API_BASE=/skinapi

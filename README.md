@@ -209,7 +209,7 @@ uvicorn routes_reference:app --reload
 ### 前端开发
 
 ```bash
-cd element-skin
+cd vskin
 npm install
 npm run dev
 ```
@@ -220,7 +220,7 @@ npm run dev
 
 ```text
 vSkin/
-├── element-skin/        # Vue 3 前端
+├── vskin/               # Vue 3 前端
 ├── skin-backend/        # FastAPI 后端
 ├── config.yaml          # 宿主机配置文件
 ├── docker-compose.yml   # Docker Compose 编排文件
