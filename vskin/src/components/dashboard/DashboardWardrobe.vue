@@ -56,6 +56,7 @@
       v-model="showDetailDialog"
       width="800px"
       destroy-on-close
+      append-to-body
       class="dialog-viewer"
     >
       <div class="viewer-layout" v-if="selectedTexture">
@@ -151,7 +152,7 @@
     </el-dialog>
 
     <!-- 上传对话框 -->
-    <el-dialog v-model="showUploadDialog" title="上传纹理" width="500px" class="upload-dialog">
+    <el-dialog v-model="showUploadDialog" title="上传纹理" width="500px" append-to-body class="upload-dialog">
       <el-form label-width="100px" :model="uploadForm" class="upload-form">
         <el-form-item label="选择文件" class="upload-form-item">
           <el-upload
