@@ -302,9 +302,6 @@ class AdminBackend:
             raise HTTPException(status_code=404, detail="user not found")
 
     async def set_user_group(self, user_id: str, actor_id: str, user_group: str):
-        if actor_id == user_id:
-            raise HTTPException(status_code=403, detail="cannot change own user group")
-
         actor = await self.db.user.get_by_id(actor_id)
         if not actor:
             raise HTTPException(status_code=401, detail="actor not found")
@@ -316,6 +313,15 @@ class AdminBackend:
         target_group = resolve_user_group(getattr(target, "user_group", None), target.is_admin)
 
         desired_group = normalize_user_group(user_group)
+
+        # 特例：允许超级管理员将自己再次设置为超级管理员，用于权限刷新
+        if actor_id == user_id:
+            if actor_group == SUPER_ADMIN_GROUP and desired_group == SUPER_ADMIN_GROUP:
+                ok = await self.db.user.set_user_group(user_id, SUPER_ADMIN_GROUP)
+                if not ok:
+                    raise HTTPException(status_code=404, detail="user not found")
+                return
+            raise HTTPException(status_code=403, detail="cannot change own user group")
 
         if target_group == SUPER_ADMIN_GROUP:
             raise HTTPException(status_code=403, detail="cannot change super admin group")

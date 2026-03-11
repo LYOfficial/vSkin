@@ -132,7 +132,7 @@
                     type="primary"
                     size="small"
                     @click="setUserGroup(currentUser)"
-                    :disabled="isCurrentUserSelf(currentUser) || pendingUserGroup === getUserGroupKey(currentUser)"
+                    :disabled="(pendingUserGroup === getUserGroupKey(currentUser)) && !canSelfRefreshSuperAdmin(currentUser)"
                     class="hover-lift"
                   >保存</el-button>
                 </div>
@@ -261,6 +261,7 @@ const pendingUserGroup = ref('user')
 const actorGroup = ref('user')
 
 const userGroupOptions = [
+  { label: '超级管理员', value: 'super_admin' },
   { label: '用户', value: 'user' },
   { label: '老师', value: 'teacher' },
   { label: '管理员', value: 'admin' },
@@ -316,14 +317,33 @@ function getUserGroupInfo(user) {
 }
 
 function canAssignGroup(group) {
+  const selfEditing = currentUser.value && isCurrentUserSelf(currentUser.value)
+  if (group === 'super_admin') return actorGroup.value === 'super_admin' && selfEditing
   if (group === 'admin') return actorGroup.value === 'super_admin'
   return group !== 'super_admin'
+}
+
+function canSelfRefreshSuperAdmin(user) {
+  return (
+    !!user &&
+    isCurrentUserSelf(user) &&
+    actorGroup.value === 'super_admin' &&
+    pendingUserGroup.value === 'super_admin'
+  )
 }
 
 async function setUserGroup(user) {
   try {
     await ElMessageBox.confirm(`确定将 ${user.email} 设置为 ${getUserGroupInfo({ user_group: pendingUserGroup.value }).title} 吗？`, '确认', { type: 'warning' })
     await axios.post(`/admin/users/${user.id}/set-group`, { user_group: pendingUserGroup.value }, { headers: authHeaders() })
+
+    if (isCurrentUserSelf(user)) {
+      const tokenResp = await axios.post('/me/refresh-token', {}, { headers: authHeaders() })
+      if (tokenResp?.data?.token) {
+        localStorage.setItem('jwt', tokenResp.data.token)
+      }
+    }
+
     ElMessage.success('操作成功')
     await refreshUsers()
     if (currentUser.value) {

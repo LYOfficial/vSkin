@@ -77,6 +77,18 @@ async def test_only_super_admin_can_assign_admin(db_session, test_config, user_f
     assert exc.value.status_code == 403
 
 
+@pytest.mark.asyncio
+async def test_super_admin_can_refresh_own_group(db_session, test_config, user_factory):
+    backend = AdminBackend(db_session, test_config)
+    super_admin = await user_factory(is_admin=True, username="RootUser")
+    await db_session.user.set_user_group(super_admin.id, "super_admin")
+
+    await backend.set_user_group(super_admin.id, super_admin.id, "super_admin")
+    row = await db_session.user.get_by_id(super_admin.id)
+    assert row.user_group == "super_admin"
+    assert row.is_admin == 1
+
+
 
 @pytest.mark.asyncio
 async def test_admin_invite_code_creation(db_session, test_config):
