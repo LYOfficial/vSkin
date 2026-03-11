@@ -86,15 +86,15 @@ function getCarouselUrl(filename) {
         <h1 class="hero-title">{{ siteTitle }}</h1>
         <p class="hero-subtitle">{{ siteSubtitle }}</p>
         <div class="hero-actions">
-          <el-button v-if="isLogged" size="large" @click="goDashboard" class="btn-glass btn-glass-primary hero-btn">
+          <el-button v-if="isLogged" size="large" @click="goDashboard" class="hero-btn hero-btn-primary">
             <el-icon><User /></el-icon>
             <span>进入个人面板</span>
           </el-button>
           <template v-else>
-            <el-button size="large" @click="goLogin" class="btn-glass btn-glass-primary hero-btn">
+            <el-button size="large" @click="goLogin" class="hero-btn hero-btn-primary">
               登录账号
             </el-button>
-            <el-button size="large" @click="goRegister" class="btn-glass hero-btn">
+            <el-button size="large" @click="goRegister" class="hero-btn hero-btn-secondary">
               即刻注册
             </el-button>
           </template>
@@ -181,7 +181,39 @@ function getCarouselUrl(filename) {
 }
 
 .hero-actions { display: flex; gap: 16px; justify-content: center; }
-.hero-btn { height: 52px; padding: 0 36px; font-size: 16px; font-weight: 600; border-radius: 8px; }
+.hero-btn {
+  height: 52px;
+  padding: 0 36px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  box-shadow: none !important;
+}
+
+.hero-btn-primary {
+  background: #2f78ba !important;
+  border: 1px solid #296ca8 !important;
+  color: #ffffff !important;
+}
+
+.hero-btn-primary:hover,
+.hero-btn-primary:focus {
+  background: #266aa6 !important;
+  border-color: #225e92 !important;
+}
+
+.hero-btn-secondary {
+  background: #ffffff !important;
+  border: 1px solid #c8d4e2 !important;
+  color: #27415c !important;
+}
+
+.hero-btn-secondary:hover,
+.hero-btn-secondary:focus {
+  background: #f5f8fb !important;
+  border-color: #b6c6d8 !important;
+  color: #1f3650 !important;
+}
 
 @media (max-width: 768px) {
   .hero-title { font-size: 36px; }
