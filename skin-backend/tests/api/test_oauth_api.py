@@ -57,9 +57,14 @@ async def test_oauth_authorize_and_token_exchange(client, admin_headers, auth_he
             "client_id": app["app_id"],
             "redirect_uri": app["redirect_uri"],
             "state": "s123",
+            "scope": "userinfo email",
         },
     )
     assert check_resp.status_code == 200
+    check_data = check_resp.json()
+    assert check_data["site_name"]
+    assert check_data["requester_name"]
+    assert check_data["scope"] == "userinfo email"
 
     decision_resp = await client.post(
         "/oauth/authorize/decision",
@@ -67,6 +72,7 @@ async def test_oauth_authorize_and_token_exchange(client, admin_headers, auth_he
             "client_id": app["app_id"],
             "redirect_uri": app["redirect_uri"],
             "state": "s123",
+            "scope": "userinfo email",
             "approved": True,
         },
         headers=user_h,
@@ -102,3 +108,27 @@ async def test_oauth_authorize_and_token_exchange(client, admin_headers, auth_he
     assert userinfo_resp.status_code == 200
     userinfo = userinfo_resp.json()
     assert userinfo["sub"] == auth_headers["X-User-ID"]
+    assert userinfo.get("username")
+    assert userinfo.get("avatar_url")
+    assert userinfo.get("email")
+
+    profile_resp = await client.get(
+        "/oauth/profile",
+        headers={"Authorization": f"Bearer {token_data['access_token']}"},
+    )
+    assert profile_resp.status_code == 200
+    assert profile_resp.json().get("username")
+
+    avatar_resp = await client.get(
+        "/oauth/avatar",
+        headers={"Authorization": f"Bearer {token_data['access_token']}"},
+    )
+    assert avatar_resp.status_code == 200
+    assert avatar_resp.json().get("avatar_url")
+
+    email_resp = await client.get(
+        "/oauth/email",
+        headers={"Authorization": f"Bearer {token_data['access_token']}"},
+    )
+    assert email_resp.status_code == 200
+    assert email_resp.json().get("email")

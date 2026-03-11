@@ -17,13 +17,13 @@
         <el-alert v-if="errorMessage" :title="errorMessage" type="error" :closable="false" show-icon />
 
         <div v-else class="app-info">
-          <div class="info-row"><span>应用名称</span><strong>{{ appName }}</strong></div>
-          <div class="info-row"><span>AppID</span><strong>{{ clientId }}</strong></div>
-          <div class="info-row"><span>回调地址</span><strong class="mono">{{ redirectUri }}</strong></div>
-        </div>
-
-        <div class="scope-tip" v-if="!errorMessage">
-          授权后，该应用可读取你的基础账号信息（ID、邮箱、用户名）。
+          <div class="oauth-request-title">{{ requesterName }} 请求以 {{ siteName }} 账号登录</div>
+          <div class="oauth-scope-list">
+            <div class="scope-item" v-for="item in scopeItems" :key="item.key">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.description }}</span>
+            </div>
+          </div>
         </div>
 
         <div class="actions" v-if="!errorMessage">
@@ -51,10 +51,13 @@ const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
 
-const appName = ref('')
+const requesterName = ref('第三方应用')
+const siteName = ref('vSkin')
 const clientId = ref('')
 const redirectUri = ref('')
 const state = ref('')
+const scope = ref('userinfo')
+const scopeItems = ref([])
 
 const isLogged = computed(() => !!localStorage.getItem('jwt'))
 
@@ -80,6 +83,7 @@ async function loadAuthorizeInfo() {
     const queryClientId = Number(route.query.client_id || 0)
     const queryRedirectUri = String(route.query.redirect_uri || '')
     const queryState = String(route.query.state || '')
+    const queryScope = String(route.query.scope || 'userinfo')
 
     if (!queryClientId || !queryRedirectUri) {
       errorMessage.value = '缺少 client_id 或 redirect_uri 参数'
@@ -91,13 +95,17 @@ async function loadAuthorizeInfo() {
         client_id: queryClientId,
         redirect_uri: queryRedirectUri,
         state: queryState,
+        scope: queryScope,
       },
     })
 
-    appName.value = res.data.client_name || '未命名应用'
+    requesterName.value = res.data.requester_name || '第三方应用'
+    siteName.value = res.data.site_name || 'vSkin'
     clientId.value = String(res.data.app_id)
     redirectUri.value = res.data.redirect_uri
     state.value = res.data.state || ''
+    scope.value = res.data.scope || 'userinfo'
+    scopeItems.value = res.data.scope_items || []
   } catch (e) {
     errorMessage.value = e.response?.data?.detail || '授权请求无效'
   } finally {
@@ -119,6 +127,7 @@ async function submitDecision(approved) {
         client_id: Number(clientId.value),
         redirect_uri: redirectUri.value,
         state: state.value,
+        scope: scope.value,
         approved,
       },
       { headers: authHeaders() },
@@ -208,43 +217,37 @@ onMounted(loadAuthorizeInfo)
 }
 
 .app-info {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+.oauth-request-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d2418;
+  margin-bottom: 12px;
+}
+
+.oauth-scope-list {
+  display: grid;
+  gap: 10px;
+}
+
+.scope-item {
+  display: grid;
+  gap: 4px;
   padding: 10px 12px;
   background: #fff;
   border: 1px solid #f1dfc8;
   border-radius: 10px;
 }
 
-.info-row span {
-  color: #7a6a58;
-}
-
-.info-row strong {
+.scope-item strong {
   color: #2d2418;
-  text-align: right;
 }
 
-.mono {
-  font-family: "Consolas", "Courier New", monospace;
-  font-size: 12px;
-  word-break: break-all;
-}
-
-.scope-tip {
-  margin-top: 6px;
-  color: #7e5a1d;
-  background: #fff7e3;
-  border: 1px solid #ffe1a7;
-  border-radius: 10px;
-  padding: 12px;
+.scope-item span {
+  color: #7a6a58;
+  font-size: 13px;
 }
 
 .actions {

@@ -10,9 +10,83 @@ from database_module import Database
 
 
 class OAuthBackend:
+    SUPPORTED_SCOPES = {
+        "userinfo": {
+            "label": "用户基础信息",
+            "description": "读取用户ID、用户名和头像",
+        },
+        "profile": {
+            "label": "用户名",
+            "description": "读取用户名（显示名称）",
+        },
+        "avatar": {
+            "label": "头像",
+            "description": "读取头像地址",
+        },
+        "email": {
+            "label": "邮箱",
+            "description": "读取邮箱地址",
+        },
+    }
+
     def __init__(self, db: Database, config: Config):
         self.db = db
         self.config = config
+
+    def _site_url(self) -> str:
+        return str(self.config.get("server.site_url", "")).rstrip("/")
+
+    def _api_url(self) -> str:
+        api_url = str(self.config.get("server.api_url", "")).rstrip("/")
+        if api_url:
+            return api_url
+        site = self._site_url()
+        root_path = str(self.config.get("server.root_path", "")).rstrip("/")
+        if site and root_path:
+            return site + root_path
+        return site
+
+    def _avatar_url_from_hash(self, avatar_hash: str | None) -> str:
+        site = self._site_url()
+        if avatar_hash:
+            path = f"/static/textures/{avatar_hash}.png"
+            return f"{site}{path}" if site else path
+        path = "/public/default-avatar"
+        api_url = self._api_url()
+        return f"{api_url}{path}" if api_url else path
+
+    def _parse_scope(self, scope: str) -> tuple[str, list[str]]:
+        raw = (scope or "userinfo").replace(",", " ")
+        chunks = [x.strip() for x in raw.split(" ") if x.strip()]
+        if not chunks:
+            chunks = ["userinfo"]
+
+        result: list[str] = []
+        for item in chunks:
+            if item == "basic":
+                item = "userinfo"
+            if item not in self.SUPPORTED_SCOPES:
+                raise HTTPException(status_code=400, detail=f"unsupported scope: {item}")
+            if item not in result:
+                result.append(item)
+        return " ".join(result), result
+
+    def _scope_items(self, scopes: list[str]) -> list[dict]:
+        items = []
+        for key in scopes:
+            meta = self.SUPPORTED_SCOPES.get(key, {})
+            items.append(
+                {
+                    "key": key,
+                    "label": meta.get("label", key),
+                    "description": meta.get("description", ""),
+                }
+            )
+        return items
+
+    def _has_scope(self, scope_text: str, item: str) -> bool:
+        _, scopes = self._parse_scope(scope_text)
+        return item in scopes
 
     def _normalize_redirect_uri(self, redirect_uri: str) -> str:
         if not redirect_uri:
@@ -103,7 +177,13 @@ class OAuthBackend:
             "sample_redirect_uri": sample_redirect,
         }
 
-    async def build_authorize_preview(self, client_id: int, redirect_uri: str, state: str = "") -> dict:
+    async def build_authorize_preview(
+        self,
+        client_id: int,
+        redirect_uri: str,
+        state: str = "",
+        scope: str = "userinfo",
+    ) -> dict:
         app = await self.db.oauth.get_client(client_id)
         if not app:
             raise HTTPException(status_code=400, detail="invalid client_id")
@@ -112,11 +192,18 @@ class OAuthBackend:
         if final_redirect_uri != app["redirect_uri"]:
             raise HTTPException(status_code=400, detail="redirect_uri mismatch")
 
+        normalized_scope, parsed_scopes = self._parse_scope(scope)
+        site_name = await self.db.setting.get("site_name", "vSkin")
+
         return {
             "app_id": app["app_id"],
             "client_name": app["client_name"],
+            "requester_name": app["client_name"] or "第三方应用",
+            "site_name": site_name or "vSkin",
             "redirect_uri": app["redirect_uri"],
             "state": state or "",
+            "scope": normalized_scope,
+            "scope_items": self._scope_items(parsed_scopes),
         }
 
     def _build_redirect(self, redirect_uri: str, params: dict) -> str:
@@ -131,7 +218,7 @@ class OAuthBackend:
         redirect_uri: str,
         state: str,
         approved: bool,
-        scope: str = "basic",
+        scope: str = "userinfo",
     ) -> dict:
         app = await self.db.oauth.get_client(client_id)
         if not app:
@@ -151,6 +238,8 @@ class OAuthBackend:
         if not user:
             raise HTTPException(status_code=401, detail="user not found")
 
+        normalized_scope, _ = self._parse_scope(scope)
+
         code = self._make_code()
         now = int(time.time() * 1000)
         expires_at = now + 5 * 60 * 1000
@@ -159,7 +248,7 @@ class OAuthBackend:
             app_id=client_id,
             user_id=user_id,
             redirect_uri=final_redirect_uri,
-            scope=scope or "basic",
+            scope=normalized_scope,
             expires_at=expires_at,
         )
 
@@ -212,7 +301,7 @@ class OAuthBackend:
             refresh_token=refresh_token,
             app_id=client_id,
             user_id=auth_code["user_id"],
-            scope=auth_code.get("scope") or "basic",
+            scope=auth_code.get("scope") or "userinfo",
             expires_at=expires_at,
         )
 
@@ -221,10 +310,10 @@ class OAuthBackend:
             "token_type": "Bearer",
             "expires_in": expires_in,
             "refresh_token": refresh_token,
-            "scope": auth_code.get("scope") or "basic",
+            "scope": auth_code.get("scope") or "userinfo",
         }
 
-    async def get_userinfo(self, access_token: str) -> dict:
+    async def _resolve_token_and_user(self, access_token: str) -> tuple[dict, object]:
         record = await self.db.oauth.get_access_token(access_token)
         if not record:
             raise HTTPException(status_code=401, detail="invalid token")
@@ -237,11 +326,59 @@ class OAuthBackend:
         if not user:
             raise HTTPException(status_code=401, detail="invalid token")
 
+        return record, user
+
+    async def get_userinfo(self, access_token: str) -> dict:
+        record, user = await self._resolve_token_and_user(access_token)
+        scope_text = record.get("scope") or "userinfo"
+        payload = {
+            "sub": user.id,
+            "app_id": record["app_id"],
+            "scope": scope_text,
+        }
+
+        if self._has_scope(scope_text, "userinfo") or self._has_scope(scope_text, "profile"):
+            payload["username"] = user.display_name
+            payload["display_name"] = user.display_name
+
+        if self._has_scope(scope_text, "userinfo") or self._has_scope(scope_text, "avatar"):
+            payload["avatar_url"] = self._avatar_url_from_hash(user.avatar_hash)
+
+        if self._has_scope(scope_text, "email"):
+            payload["email"] = user.email
+
+        return payload
+
+    async def get_profile_info(self, access_token: str) -> dict:
+        record, user = await self._resolve_token_and_user(access_token)
+        scope_text = record.get("scope") or "userinfo"
+        if not (self._has_scope(scope_text, "userinfo") or self._has_scope(scope_text, "profile")):
+            raise HTTPException(status_code=403, detail="missing profile scope")
+        return {
+            "sub": user.id,
+            "username": user.display_name,
+            "display_name": user.display_name,
+            "scope": scope_text,
+        }
+
+    async def get_avatar_info(self, access_token: str) -> dict:
+        record, user = await self._resolve_token_and_user(access_token)
+        scope_text = record.get("scope") or "userinfo"
+        if not (self._has_scope(scope_text, "userinfo") or self._has_scope(scope_text, "avatar")):
+            raise HTTPException(status_code=403, detail="missing avatar scope")
+        return {
+            "sub": user.id,
+            "avatar_url": self._avatar_url_from_hash(user.avatar_hash),
+            "scope": scope_text,
+        }
+
+    async def get_email_info(self, access_token: str) -> dict:
+        record, user = await self._resolve_token_and_user(access_token)
+        scope_text = record.get("scope") or "userinfo"
+        if not self._has_scope(scope_text, "email"):
+            raise HTTPException(status_code=403, detail="missing email scope")
         return {
             "sub": user.id,
             "email": user.email,
-            "display_name": user.display_name,
-            "is_admin": bool(user.is_admin),
-            "app_id": record["app_id"],
-            "scope": record.get("scope") or "basic",
+            "scope": scope_text,
         }

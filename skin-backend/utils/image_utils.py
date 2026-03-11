@@ -109,3 +109,70 @@ def normalize_png(image_bytes: bytes) -> Tuple[bytes, Image.Image]:
         return output.getvalue(), img
     except Exception as e:
         raise ValueError(f"Failed to normalize PNG: {str(e)}")
+
+
+def extract_skin_head_avatar(image_bytes: bytes, output_size: int = 256) -> bytes:
+    """
+    从皮肤中截取正脸头像（含帽子层）并输出为方形 PNG。
+
+    支持 64x64、64x32 以及其高清等比尺寸。
+    """
+    try:
+        skin = Image.open(BytesIO(image_bytes)).convert("RGBA")
+    except Exception as e:
+        raise ValueError(f"Invalid skin image: {str(e)}")
+
+    width, height = skin.size
+    if width < 64 or height < 32 or width % 64 != 0:
+        raise ValueError("Invalid skin dimensions for avatar extraction")
+
+    scale = width // 64
+    if scale <= 0:
+        raise ValueError("Invalid skin scale")
+
+    # 基础头部正脸: (8,8)~(15,15)
+    base_face = skin.crop((8 * scale, 8 * scale, 16 * scale, 16 * scale))
+
+    # 帽子层正脸: (40,8)~(47,15) (64x64 存在；64x32 视作透明)
+    if height >= 16 * scale and width >= 48 * scale:
+        hat_face = skin.crop((40 * scale, 8 * scale, 48 * scale, 16 * scale))
+        base_face.alpha_composite(hat_face)
+
+    avatar = base_face.resize((output_size, output_size), Image.NEAREST)
+    output = BytesIO()
+    avatar.save(output, format="PNG")
+    return output.getvalue()
+
+
+def default_steve_head_avatar(output_size: int = 256) -> bytes:
+    """
+    生成默认 Steve 风格 8x8 正脸平面头像并放大输出。
+    """
+    # 简化 Steve 正脸配色（8x8）
+    palette = [
+        ["#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6"],
+        ["#6f9fd6", "#e7c3a1", "#e7c3a1", "#e7c3a1", "#e7c3a1", "#e7c3a1", "#e7c3a1", "#6f9fd6"],
+        ["#6f9fd6", "#2f2a28", "#e7c3a1", "#e7c3a1", "#e7c3a1", "#e7c3a1", "#2f2a28", "#6f9fd6"],
+        ["#6f9fd6", "#2f2a28", "#e7c3a1", "#e7c3a1", "#e7c3a1", "#e7c3a1", "#2f2a28", "#6f9fd6"],
+        ["#6f9fd6", "#e7c3a1", "#e7c3a1", "#d39f7d", "#d39f7d", "#e7c3a1", "#e7c3a1", "#6f9fd6"],
+        ["#6f9fd6", "#e7c3a1", "#bf8b69", "#bf8b69", "#bf8b69", "#bf8b69", "#e7c3a1", "#6f9fd6"],
+        ["#6f9fd6", "#e7c3a1", "#9c6b4c", "#9c6b4c", "#9c6b4c", "#9c6b4c", "#e7c3a1", "#6f9fd6"],
+        ["#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6", "#6f9fd6"],
+    ]
+
+    head = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+    px = head.load()
+    for y in range(8):
+        for x in range(8):
+            color = palette[y][x].lstrip("#")
+            px[x, y] = (
+                int(color[0:2], 16),
+                int(color[2:4], 16),
+                int(color[4:6], 16),
+                255,
+            )
+
+    avatar = head.resize((output_size, output_size), Image.NEAREST)
+    output = BytesIO()
+    avatar.save(output, format="PNG")
+    return output.getvalue()

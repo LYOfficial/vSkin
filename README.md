@@ -12,6 +12,7 @@
 * **完整协议支持**：兼容 Yggdrasil 协议，可直接对接 Authlib-Injector 与常见启动器。
 * **用户系统完整**：支持注册、登录、密码找回、邮箱验证码、邀请码注册与 JWT 鉴权。
 * **材质管理完善**：支持皮肤与披风上传、公开材质库、角色绑定，以及 3D 预览。
+* **方形头像系统**：默认使用 Steve 头部平面头像；用户可从已上传/已收藏皮肤中一键截取正脸设为头像。
 * **后台能力充足**：支持站点设置、用户管理、邮件服务、轮播图、Fallback 节点配置等常见运维需求。
 * **OAuth 2 对外登录**：支持管理员创建外部应用（appid/secret/回调地址），外部网站可通过 vSkin 账号完成授权登录。
 * **可扩展部署**：默认推荐根路径部署，也支持前端子路径部署。
@@ -192,7 +193,7 @@ server {
 
 授权流程（Authorization Code）：
 
-1. 外部网站将用户跳转到：`https://你的站点/oauth/authorize?client_id={appid}&redirect_uri={redirect_uri}&state={state}`
+1. 外部网站将用户跳转到：`https://你的站点/oauth/authorize?client_id={appid}&redirect_uri={redirect_uri}&state={state}&scope={scope}`
 2. 用户在 vSkin 页面登录并确认授权。
 3. vSkin 回跳到 `redirect_uri`，并附带 `code`（以及原始 `state`）。
 4. 外部网站向令牌接口提交表单：
@@ -203,6 +204,31 @@ server {
   * `client_secret={client_secret}`
   * `redirect_uri={redirect_uri}`
 5. 使用返回的 `access_token` 调用：`GET {api_url}/oauth/userinfo`，并带上 `Authorization: Bearer {access_token}`。
+
+授权页说明：
+
+* 用户授权页仅展示「{第三方站点} 请求以 {本站} 登录」及权限列表（scope）。
+* 不再向用户展示 appid、回调地址等技术参数。
+* 用户只需同意授权或拒绝授权。
+
+推荐 scope：
+
+* `userinfo`：用户基础信息（用户ID、用户名、头像）
+* `profile`：用户名
+* `avatar`：头像地址
+* `email`：邮箱
+
+可用接口（均需 `Authorization: Bearer {access_token}`）：
+
+* `GET {api_url}/oauth/userinfo`：按 scope 返回综合信息（如 `sub`、`username`、`avatar_url`、`email`）
+* `GET {api_url}/oauth/profile`：用户名信息接口
+* `GET {api_url}/oauth/avatar`：头像信息接口
+* `GET {api_url}/oauth/email`：邮箱信息接口
+
+头像相关接口：
+
+* `POST {api_url}/me/avatar/from-texture`：从用户已拥有皮肤截取头部正脸并设为头像
+* `GET {api_url}/public/default-avatar`：默认 Steve 头部方形头像
 
 说明：
 

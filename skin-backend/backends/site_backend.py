@@ -2,6 +2,7 @@ from typing import Optional, Dict, List, Any
 import re
 import time
 import os
+import hashlib
 import random
 import string
 from fastapi import HTTPException
@@ -12,6 +13,7 @@ from utils.jwt_utils import create_jwt_token
 from utils.email_utils import EmailSender
 from utils.uuid_utils import generate_random_uuid
 from utils.typing import User, PlayerProfile
+from utils.image_utils import extract_skin_head_avatar
 from database_module import Database
 from config_loader import Config
 
@@ -23,6 +25,34 @@ class SiteBackend:
         self.db = db
         self.config = config
         self.email_sender = EmailSender(db)
+        self.textures_dir = getattr(self.db.texture, "textures_dir", self.config.get("textures.directory", "textures"))
+        os.makedirs(self.textures_dir, exist_ok=True)
+
+    def _site_url(self) -> str:
+        return str(self.config.get("server.site_url", "")).rstrip("/")
+
+    def _api_url(self) -> str:
+        api_url = str(self.config.get("server.api_url", "")).rstrip("/")
+        if api_url:
+            return api_url
+        site = self._site_url()
+        root_path = str(self.config.get("server.root_path", "")).rstrip("/")
+        if site and root_path:
+            return site + root_path
+        return site
+
+    def _avatar_url_from_hash(self, avatar_hash: str | None) -> str:
+        site = self._site_url()
+        if avatar_hash:
+            path = f"/static/textures/{avatar_hash}.png"
+            return f"{site}{path}" if site else path
+
+        path = "/public/default-avatar"
+        api_url = self._api_url()
+        return f"{api_url}{path}" if api_url else path
+
+    def build_avatar_url(self, avatar_hash: str | None) -> str:
+        return self._avatar_url_from_hash(avatar_hash)
 
     # ========== Auth & User ==========
 
@@ -207,9 +237,61 @@ class SiteBackend:
             "email": user_row.email,
             "lang": user_row.preferredLanguage,
             "display_name": user_row.display_name,
+            "avatar_hash": user_row.avatar_hash,
+            "avatar_url": self._avatar_url_from_hash(user_row.avatar_hash),
             "is_admin": bool(user_row.is_admin),
             "banned_until": user_row.banned_until,
             "profiles": profiles_list,
+        }
+
+    async def set_avatar_from_texture(self, user_id: str, texture_hash: str) -> Dict[str, Any]:
+        if not texture_hash:
+            raise HTTPException(status_code=400, detail="texture hash required")
+
+        if not await self.db.texture.verify_ownership(user_id, texture_hash, "skin"):
+            raise HTTPException(status_code=403, detail="skin texture not found in your library")
+
+        skin_path = os.path.join(self.textures_dir, f"{texture_hash}.png")
+        if not os.path.isfile(skin_path):
+            fallback_path = os.path.join("textures", f"{texture_hash}.png")
+            if os.path.isfile(fallback_path):
+                skin_path = fallback_path
+            else:
+                alt_dir = str(self.config.get("textures.directory", "textures"))
+                alt_path = os.path.join(alt_dir, f"{texture_hash}.png")
+                if os.path.isfile(alt_path):
+                    skin_path = alt_path
+                else:
+                    raise HTTPException(status_code=404, detail="skin file not found")
+
+        with open(skin_path, "rb") as f:
+            skin_bytes = f.read()
+
+        avatar_bytes = extract_skin_head_avatar(skin_bytes, output_size=256)
+        avatar_hash = hashlib.sha256((user_id + texture_hash + str(time.time())).encode("utf-8")).hexdigest()[:48]
+        avatar_path = os.path.join(self.textures_dir, f"{avatar_hash}.png")
+
+        with open(avatar_path, "wb") as f:
+            f.write(avatar_bytes)
+
+        await self.db.user.update_avatar_hash(user_id, avatar_hash)
+        return {
+            "avatar_hash": avatar_hash,
+            "avatar_url": self._avatar_url_from_hash(avatar_hash),
+        }
+
+    async def get_oauth_userinfo_payload(self, user_id: str) -> Dict[str, Any]:
+        user = await self.db.user.get_by_id(user_id)
+        if not user:
+            raise HTTPException(status_code=401, detail="invalid token")
+
+        return {
+            "sub": user.id,
+            "username": user.display_name,
+            "display_name": user.display_name,
+            "email": user.email,
+            "avatar_url": self._avatar_url_from_hash(user.avatar_hash),
+            "is_admin": bool(user.is_admin),
         }
 
     async def refresh_token(self, user_id: str) -> Dict[str, Any]:

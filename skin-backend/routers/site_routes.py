@@ -11,8 +11,10 @@ from fastapi import (
     Form,
     Query,
 )
+from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
+from utils.image_utils import default_steve_head_avatar
 
 from utils.jwt_utils import decode_jwt_token
 from database_module import Database
@@ -79,6 +81,14 @@ def setup_routes(db: Database, site_backend, oauth_backend, rate_limiter, config
     @router.get("/me")
     async def me(payload: dict = Depends(get_current_user)):
         return await site_backend.get_user_info(payload.get("sub"))
+
+    @router.post("/me/avatar/from-texture")
+    async def me_set_avatar_from_texture(
+        payload: dict = Depends(get_current_user),
+        body: dict = Body(...),
+    ):
+        texture_hash = body.get("hash")
+        return await site_backend.set_avatar_from_texture(payload.get("sub"), texture_hash)
 
     @router.post("/me/refresh-token")
     async def refresh_jwt(payload: dict = Depends(get_current_user)):
@@ -330,6 +340,11 @@ def setup_routes(db: Database, site_backend, oauth_backend, rate_limiter, config
     async def get_carousel():
         return await site_backend.list_carousel_images()
 
+    @router.get("/public/default-avatar")
+    async def get_default_avatar():
+        png_data = default_steve_head_avatar(output_size=256)
+        return Response(content=png_data, media_type="image/png")
+
     # ========== OAuth 2 ========== 
 
     @router.get("/oauth/authorize/check")
@@ -337,8 +352,9 @@ def setup_routes(db: Database, site_backend, oauth_backend, rate_limiter, config
         client_id: int = Query(...),
         redirect_uri: str = Query(...),
         state: str = Query(default=""),
+        scope: str = Query(default="userinfo"),
     ):
-        return await oauth_backend.build_authorize_preview(client_id, redirect_uri, state)
+        return await oauth_backend.build_authorize_preview(client_id, redirect_uri, state, scope)
 
     @router.post("/oauth/authorize/decision")
     async def oauth_authorize_decision(
@@ -386,5 +402,35 @@ def setup_routes(db: Database, site_backend, oauth_backend, rate_limiter, config
         if not access_token:
             raise HTTPException(status_code=401, detail="missing bearer token")
         return await oauth_backend.get_userinfo(access_token)
+
+    @router.get("/oauth/profile")
+    async def oauth_profile(request: Request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="missing bearer token")
+        access_token = auth_header[7:].strip()
+        if not access_token:
+            raise HTTPException(status_code=401, detail="missing bearer token")
+        return await oauth_backend.get_profile_info(access_token)
+
+    @router.get("/oauth/avatar")
+    async def oauth_avatar(request: Request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="missing bearer token")
+        access_token = auth_header[7:].strip()
+        if not access_token:
+            raise HTTPException(status_code=401, detail="missing bearer token")
+        return await oauth_backend.get_avatar_info(access_token)
+
+    @router.get("/oauth/email")
+    async def oauth_email(request: Request):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="missing bearer token")
+        access_token = auth_header[7:].strip()
+        if not access_token:
+            raise HTTPException(status_code=401, detail="missing bearer token")
+        return await oauth_backend.get_email_info(access_token)
 
     return router

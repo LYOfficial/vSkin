@@ -9,7 +9,7 @@
 
     <el-card class="profile-form-card surface-card animate-card-slide">
       <div class="profile-header">
-        <el-avatar :size="72" class="profile-avatar">{{ emailInitial }}</el-avatar>
+        <el-avatar :size="72" :src="avatarUrl" shape="square" class="profile-avatar" />
         <div class="profile-meta">
           <h3>{{ user?.display_name || '未设置用户名' }}</h3>
           <p>{{ user?.email }}</p>
@@ -142,10 +142,7 @@ const showDeleteDialog = ref(false)
 const deleteConfirmText = ref('')
 const motionDisabled = ref(localStorage.getItem('motionDisabled') === '1')
 
-const emailInitial = computed(() => {
-  const email = user.value?.email || user.value?.display_name || 'U'
-  return email.charAt(0).toUpperCase()
-})
+const avatarUrl = computed(() => user.value?.avatar_url || '')
 
 watch(() => user.value, (newUser) => {
   if (newUser) {
@@ -276,10 +273,8 @@ async function confirmDeleteAccount() {
 }
 
 .profile-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
-  font-weight: bold;
-  font-size: 24px;
+  border-radius: 10px;
+  background: #f2f4f7;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

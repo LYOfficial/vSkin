@@ -40,13 +40,13 @@
           <el-popover v-if="isLogged" placement="bottom-end" :width="240" trigger="hover" popper-class="account-popover" :show-arrow="false" :offset="4">
             <template #reference>
               <div class="account-trigger">
-                <el-avatar size="small" class="account-avatar bg-gradient-purple">{{ avatarInitial }}</el-avatar>
+                <el-avatar :size="32" :src="avatarUrl" shape="square" class="account-avatar" />
                 <span class="account-name">{{ accountName }}</span>
               </div>
             </template>
             <div class="account-panel surface-card">
               <div class="account-header">
-                <el-avatar :size="48" class="account-avatar bg-gradient-purple">{{ avatarInitial }}</el-avatar>
+                <el-avatar :size="48" :src="avatarUrl" shape="square" class="account-avatar" />
                 <div class="account-meta">
                   <h4>{{ accountName }}</h4>
                   <p>{{ isAdmin ? '管理员' : '普通用户' }}</p>
@@ -245,7 +245,7 @@ function parseJwt(token) {
 const isLogged = computed(() => !!jwtToken.value)
 const isAdmin = computed(() => user.value?.is_admin || false)
 const accountName = computed(() => user.value?.display_name || user.value?.email || '用户')
-const avatarInitial = computed(() => (accountName.value || 'U').slice(0, 1).toUpperCase())
+const avatarUrl = computed(() => user.value?.avatar_url || '')
 
 let authTimer = null
 let resizeObserver = null

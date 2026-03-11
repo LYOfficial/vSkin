@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     password TEXT NOT NULL,
     preferred_language TEXT DEFAULT 'zh_CN',
     display_name TEXT DEFAULT '',
+    avatar_hash TEXT DEFAULT NULL,
     is_admin INTEGER DEFAULT 0,
     banned_until INTEGER DEFAULT NULL
 );
@@ -181,6 +182,15 @@ class Database(BaseDB):
             # 创建基础表结构
             await conn.executescript(INIT_SQL)
             await conn.commit()
+
+            # 兼容旧库：users 增加 avatar_hash 列
+            cursor = await conn.execute("PRAGMA table_info(users)")
+            user_columns = [row[1] for row in await cursor.fetchall()]
+            if "avatar_hash" not in user_columns:
+                await conn.execute(
+                    "ALTER TABLE users ADD COLUMN avatar_hash TEXT DEFAULT NULL"
+                )
+                await conn.commit()
 
             # 兼容旧库：fallback_endpoints 增加 skin_domains 列
             cursor = await conn.execute("PRAGMA table_info(fallback_endpoints)")

@@ -109,6 +109,13 @@
             </el-radio-group>
           </section>
 
+          <section class="viewer-section" v-if="selectedTexture.type === 'skin'">
+            <div class="viewer-section-label">头像</div>
+            <el-button @click="setAsAvatar" :loading="settingAvatar" class="gallery-avatar-btn">
+              将此皮肤设为头像
+            </el-button>
+          </section>
+
           <section class="viewer-section" v-if="!isDetailLoading && selectedTexture.is_public !== 2">
             <div class="viewer-section-label">公开状态</div>
             <div class="public-toggle-row">
@@ -230,6 +237,7 @@ const selectedTexture = ref(null)
 const isDetailLoading = ref(false)
 const editingNoteValue = ref('')
 const isApplying = ref(false)
+const settingAvatar = ref(false)
 const noteInputRef = ref(null)
 
 const showUploadDialog = ref(false)
@@ -422,6 +430,22 @@ async function doApply() {
   }
 }
 
+async function setAsAvatar() {
+  if (!selectedTexture.value || selectedTexture.value.type !== 'skin') return
+  settingAvatar.value = true
+  try {
+    await axios.post('/me/avatar/from-texture', {
+      hash: selectedTexture.value.hash,
+    }, { headers: authHeaders() })
+    ElMessage.success('头像已更新')
+    fetchMe()
+  } catch (e) {
+    ElMessage.error('设置头像失败: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    settingAvatar.value = false
+  }
+}
+
 onMounted(() => {
   fetchTextures()
 })
@@ -495,6 +519,11 @@ onMounted(() => {
 }
 
 .gallery-delete-btn {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.gallery-avatar-btn {
   width: 100%;
   border-radius: 8px;
 }

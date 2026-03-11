@@ -82,3 +82,39 @@ async def test_api_create_profile(client, auth_headers):
     
     assert resp.status_code == 200
     assert resp.json()["name"] == "ApiPlayer"
+
+
+@pytest.mark.asyncio
+async def test_api_avatar_from_texture_and_default(client, auth_headers):
+    from io import BytesIO
+    from PIL import Image
+
+    file_content = BytesIO()
+    Image.new("RGBA", size=(64, 64), color=(120, 180, 240, 255)).save(file_content, "png")
+    file_content.seek(0)
+
+    upload_resp = await client.post(
+        "/me/textures",
+        data={"texture_type": "skin", "note": "Avatar Skin", "is_public": "false", "model": "default"},
+        files={"file": ("skin.png", file_content, "image/png")},
+        headers={"Authorization": auth_headers["Authorization"]},
+    )
+    assert upload_resp.status_code == 200
+    skin_hash = upload_resp.json().get("hash")
+    assert skin_hash
+
+    set_resp = await client.post(
+        "/me/avatar/from-texture",
+        json={"hash": skin_hash},
+        headers={"Authorization": auth_headers["Authorization"]},
+    )
+    assert set_resp.status_code == 200
+    assert set_resp.json().get("avatar_url")
+
+    me_resp = await client.get("/me", headers={"Authorization": auth_headers["Authorization"]})
+    assert me_resp.status_code == 200
+    assert me_resp.json().get("avatar_url")
+
+    default_avatar_resp = await client.get("/public/default-avatar")
+    assert default_avatar_resp.status_code == 200
+    assert default_avatar_resp.headers.get("content-type", "").startswith("image/png")
