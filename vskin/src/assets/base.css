@@ -1,27 +1,27 @@
 :root {
-  --color-background: #efedf3;
-  --color-background-soft: #f6f6f9;
-  --color-background-mute: #eceaf1;
+  --color-background: #ffffff;
+  --color-background-soft: #f7f8fb;
+  --color-background-mute: #eff1f5;
 
   --color-border: #dedde5;
   --color-border-hover: #c9c8d1;
 
-  --color-heading: #1f2836;
-  --color-text: #314155;
-  --color-text-light: #6d7b90;
-  --color-text-secondary: #6d7b90;
+  --color-heading: #12161c;
+  --color-text: #222a35;
+  --color-text-light: #667589;
+  --color-text-secondary: #667589;
 
   --color-card-background: #ffffff;
-  --color-header-background: rgba(243, 243, 248, 0.86);
+  --color-header-background: #f5f6fa;
   --color-popover-background: #ffffff;
 
-  --color-background-hero-light: radial-gradient(circle at 0% 0%, #d6e6f5 0%, #ecedf2 42%, #f8f8fb 100%);
+  --color-background-hero-light: linear-gradient(180deg, #ffffff 0%, #f6f8fc 100%);
   --color-background-hero-dark: radial-gradient(circle at 0% 0%, #2f3440 0%, #1f2330 48%, #191d28 100%);
 
   --launcher-accent: #74aed8;
   --launcher-accent-strong: #4b93cc;
-  --launcher-radius-lg: 18px;
-  --launcher-radius-md: 12px;
+  --launcher-radius-lg: 12px;
+  --launcher-radius-md: 8px;
   --section-gap: 120px;
 
   --el-input-bg-color: var(--color-card-background);
@@ -34,40 +34,40 @@
 
 /* Explicit dark mode class */
 html.dark {
-  --color-background: #202632;
-  --color-background-soft: #272f3c;
-  --color-background-mute: #323b4a;
+  --color-background: #111417;
+  --color-background-soft: #191d22;
+  --color-background-mute: #242a31;
 
-  --color-border: #3b4555;
-  --color-border-hover: #4b596c;
+  --color-border: #2f3742;
+  --color-border-hover: #3f4a58;
 
-  --color-heading: #eaf1fa;
-  --color-text: #d5deea;
-  --color-text-light: #9faec3;
-  --color-text-secondary: #9faec3;
+  --color-heading: #f5f8fc;
+  --color-text: #eef3fa;
+  --color-text-light: #9fabbc;
+  --color-text-secondary: #9fabbc;
 
-  --color-card-background: #2a3443;
-  --color-header-background: rgba(31, 39, 52, 0.82);
-  --color-popover-background: #25303f;
+  --color-card-background: #1a1f26;
+  --color-header-background: #171c22;
+  --color-popover-background: #1a2028;
 }
 
 @media (prefers-color-scheme: dark) {
   html:not(.light) {
-    --color-background: #202632;
-    --color-background-soft: #272f3c;
-    --color-background-mute: #323b4a;
+    --color-background: #111417;
+    --color-background-soft: #191d22;
+    --color-background-mute: #242a31;
 
-    --color-border: #3b4555;
-    --color-border-hover: #4b596c;
+    --color-border: #2f3742;
+    --color-border-hover: #3f4a58;
 
-    --color-heading: #eaf1fa;
-    --color-text: #d5deea;
-    --color-text-light: #9faec3;
-    --color-text-secondary: #9faec3;
+    --color-heading: #f5f8fc;
+    --color-text: #eef3fa;
+    --color-text-light: #9fabbc;
+    --color-text-secondary: #9fabbc;
 
-    --color-card-background: #2a3443;
-    --color-header-background: rgba(31, 39, 52, 0.82);
-    --color-popover-background: #25303f;
+    --color-card-background: #1a1f26;
+    --color-header-background: #171c22;
+    --color-popover-background: #1a2028;
   }
 }
 
@@ -82,7 +82,7 @@ html.dark {
 body {
   min-height: 100vh;
   color: var(--color-text);
-  background: radial-gradient(circle at 0% 0%, #dde8f4 0%, var(--color-background) 42%, #f2f1f6 100%);
+  background: var(--color-background);
   transition:
     color 0.5s,
     background-color 0.5s;
@@ -101,5 +101,5 @@ body {
 }
 
 html.dark body {
-  background: radial-gradient(circle at 0% 0%, #3a4b62 0%, var(--color-background) 42%, #1f2531 100%);
+  background: var(--color-background);
 }

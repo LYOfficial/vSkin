@@ -42,19 +42,19 @@ html.dark .hero-gradient-bg {
 
 /* Element Plus 全局覆写：启动器风格 */
 .el-button {
-  border-radius: 10px !important;
+  border-radius: 8px !important;
   font-weight: 600;
 }
 
 .el-button--primary {
-  background: linear-gradient(180deg, #7eb7df 0%, #5ea2d1 100%) !important;
-  border-color: #67a8d5 !important;
+  background: linear-gradient(180deg, #4f9ad8 0%, #3e86c8 100%) !important;
+  border-color: #458ecf !important;
 }
 
 .el-input__wrapper,
 .el-textarea__inner,
 .el-select__wrapper {
-  border-radius: 10px !important;
+  border-radius: 8px !important;
   box-shadow: 0 0 0 1px var(--color-border) inset !important;
   background: var(--color-card-background) !important;
 }
@@ -65,8 +65,8 @@ html.dark .hero-gradient-bg {
 }
 
 .el-table {
-  --el-table-header-bg-color: #f6f8fb;
-  --el-table-row-hover-bg-color: #f3f8fe;
+  --el-table-header-bg-color: #f8f9fc;
+  --el-table-row-hover-bg-color: #f2f6fb;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -225,7 +225,7 @@ html.motion-off .profile-form-card .el-divider {
   max-width: 460px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: 12px;
   padding: 32px;
   box-shadow: 0 16px 40px rgba(40, 58, 79, 0.13);
 }

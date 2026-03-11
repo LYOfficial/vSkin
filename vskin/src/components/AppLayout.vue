@@ -356,7 +356,7 @@ onUnmounted(() => {
 .is-home-layout .layout-header .theme-toggle,
 .is-home-layout .layout-header .mobile-menu-btn,
 .is-home-layout .layout-header :deep(.el-menu-item) {
-  color: #fff !important;
+  color: inherit !important;
 }
 
 .is-home-layout .layout-header .account-trigger:hover,
@@ -365,18 +365,20 @@ onUnmounted(() => {
 .is-home-layout .layout-header .mobile-menu-btn:hover,
 .is-home-layout .layout-header :deep(.el-menu-item:hover),
 .is-home-layout .layout-header :deep(.el-menu-item.is-active) {
-  background-color: rgba(255, 255, 255, 0.15) !important;
-  color: #fff !important;
+  background-color: #e9edf4 !important;
+  color: inherit !important;
 }
 
 .is-home-layout .header-actions :deep(.el-button--primary) {
-  background: rgba(64, 158, 255, 0.3) !important; border: 1px solid rgba(64, 158, 255, 0.4) !important;
-  color: #fff !important; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  background: linear-gradient(180deg, #4f9ad8 0%, #3e86c8 100%) !important;
+  border: 1px solid #458ecf !important;
+  color: #ffffff !important;
   border-radius: 8px;
 }
 .is-home-layout .hero-register-btn {
-  background: rgba(255, 255, 255, 0.15) !important; border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  color: #fff !important; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  background: #eef2f8 !important;
+  border: 1px solid #d4dbe6 !important;
+  color: #2e3a48 !important;
   border-radius: 8px; height: 32px; padding: 0 15px; font-size: 14px;
 }
 
@@ -393,42 +395,59 @@ onUnmounted(() => {
   height: 100%;
   border: 1px solid var(--color-border);
   background: var(--color-header-background);
-  border-radius: 16px;
-  backdrop-filter: blur(10px);
+  border-radius: 12px;
   padding: 0 12px;
-  box-shadow: 0 8px 24px rgba(54, 70, 90, 0.1);
+  box-shadow: none;
 }
 
 .logo {
   font-weight: 800;
-  font-size: 21px;
-  color: #24435f;
+  font-size: 20px;
+  color: #1f2a36;
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 4px 12px;
   transition: background-color 0.2s;
 }
 
 .logo:hover {
-  color: #1f5f8e;
-  background: #e7f1fb;
+  color: #1f2a36;
+  background: #eaedf3;
+}
+
+html.dark .logo {
+  color: #eef3fa;
+}
+
+html.dark .logo:hover {
+  color: #ffffff;
+  background: #28313b;
 }
 
 .desktop-nav { flex-grow: 1; display: flex; justify-content: center; height: 100%; }
 .desktop-nav .el-menu { border-bottom: none; height: 100%; background: transparent; }
 
 .desktop-nav :deep(.el-menu-item) {
-  border-radius: 10px;
+  border-radius: 8px;
   margin: 10px 4px;
   height: 42px;
   line-height: 42px;
-  color: #4e5f74;
+  color: #2e3a48;
 }
 
 .desktop-nav :deep(.el-menu-item.is-active) {
-  background: #d8ebfb;
-  color: #2d648f;
+  background: #c7e6fa;
+  color: #1f4f79;
   font-weight: 700;
+}
+
+html.dark .desktop-nav :deep(.el-menu-item) {
+  color: #d9e2ee;
+}
+
+html.dark .desktop-nav :deep(.el-menu-item.is-active) {
+  background: #2e5a80;
+  color: #eaf4ff;
 }
 
 .header-actions { display: flex; align-items: center; gap: 8px; }
@@ -447,7 +466,7 @@ onUnmounted(() => {
 .is-auth-layout .app-main { padding: 0 !important; }
 
 /* Account */
-.account-trigger { display:flex; align-items:center; cursor:pointer; gap:8px; padding:6px 12px; border-radius:20px; transition: background-color 0.2s; }
+.account-trigger { display:flex; align-items:center; cursor:pointer; gap:8px; padding:6px 10px; border-radius:8px; transition: background-color 0.2s; }
 .account-trigger:hover { background: #e9f1f9; }
 .account-name { font-size:14px; color: var(--color-text); font-weight:500; }
 .account-popover { padding: 0 !important; background: var(--color-popover-background) !important; border: 1px solid var(--color-border) !important; }
@@ -458,6 +477,10 @@ onUnmounted(() => {
 .account-meta p { margin:4px 0 0; font-size:12px; color: var(--color-text-light); }
 .account-actions { display:flex; flex-direction:column; gap:8px; width: 100%; }
 
-@media (max-width: 1200px) { .nav-priority-6 { display: none !important; } .mobile-nav { display: block; } }
+html.dark .account-trigger:hover {
+  background: #27313c;
+}
+
+@media (max-width: 1200px) { .nav-priority-5, .nav-priority-6 { display: none !important; } .mobile-nav { display: block; } }
 @media (max-width: 768px) { .desktop-nav { display: none; } }
 </style>
