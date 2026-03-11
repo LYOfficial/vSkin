@@ -258,6 +258,7 @@ const banPresetDuration = ref(24)
 const banCustomHours = ref(24)
 const banning = ref(false)
 const pendingUserGroup = ref('user')
+const actorGroup = ref('user')
 
 const userGroupOptions = [
   { label: '用户', value: 'user' },
@@ -275,8 +276,12 @@ const authHeaders = () => ({ Authorization: 'Bearer ' + localStorage.getItem('jw
 async function refreshUsers() {
   loading.value = true
   try {
-    const res = await axios.get('/admin/users', { headers: authHeaders() })
-    users.value = res.data
+    const [usersRes, meRes] = await Promise.all([
+      axios.get('/admin/users', { headers: authHeaders() }),
+      axios.get('/me', { headers: authHeaders() }),
+    ])
+    users.value = usersRes.data
+    actorGroup.value = meRes.data?.user_group || (meRes.data?.is_admin ? 'admin' : 'user')
   } catch (e) {
     ElMessage.error('加载用户列表失败')
   } finally {
@@ -310,21 +315,8 @@ function getUserGroupInfo(user) {
   return map[key] || map.user
 }
 
-function getActorGroup() {
-  try {
-    const token = localStorage.getItem('jwt')
-    if (!token) return 'user'
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    if (payload.user_group) return payload.user_group
-    return payload.is_admin ? 'admin' : 'user'
-  } catch (e) {
-    return 'user'
-  }
-}
-
 function canAssignGroup(group) {
-  const actorGroup = getActorGroup()
-  if (group === 'admin') return actorGroup === 'super_admin'
+  if (group === 'admin') return actorGroup.value === 'super_admin'
   return group !== 'super_admin'
 }
 

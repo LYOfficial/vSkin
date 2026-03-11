@@ -218,8 +218,27 @@ class Database(BaseDB):
             # 防御性修复：确保 user_group 与 is_admin 一致
             await conn.execute("UPDATE users SET user_group='admin' WHERE is_admin=1 AND (user_group IS NULL OR user_group='')")
             await conn.execute("UPDATE users SET user_group='user' WHERE (is_admin=0 OR is_admin IS NULL) AND (user_group IS NULL OR user_group='')")
+            await conn.execute("UPDATE users SET user_group='admin' WHERE is_admin=1 AND user_group NOT IN ('super_admin', 'admin')")
             await conn.execute("UPDATE users SET is_admin=1 WHERE user_group IN ('super_admin', 'admin')")
             await conn.execute("UPDATE users SET is_admin=0 WHERE user_group NOT IN ('super_admin', 'admin')")
+
+            # 保证系统中至少有一个超级管理员：若缺失，则将最早的管理员提升为超级管理员
+            await conn.execute(
+                """
+                UPDATE users
+                SET user_group='super_admin', is_admin=1
+                WHERE id=(
+                    SELECT id
+                    FROM users
+                    WHERE user_group='admin'
+                    ORDER BY rowid ASC
+                    LIMIT 1
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM users WHERE user_group='super_admin'
+                )
+                """
+            )
             await conn.commit()
 
             # 兼容旧库：fallback_endpoints 增加 skin_domains 列
