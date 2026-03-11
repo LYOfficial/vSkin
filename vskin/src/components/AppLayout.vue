@@ -207,7 +207,7 @@ const adminNavLinks = [
 
 const navLinks = computed(() => {
   if (route.path.startsWith('/admin')) return adminNavLinks
-  const links = [{ path: '/', title: '发现', icon: Odometer }]
+  const links = [{ path: '/', title: '首页', icon: Odometer }]
   if (enableSkinLibrary.value) links.push({ path: '/skin-library', title: '资源库', icon: Picture })
   if (isLogged.value) {
     links.push(...dashboardLinks)
@@ -217,7 +217,7 @@ const navLinks = computed(() => {
 })
 
 const drawerLinks = computed(() => {
-  const links = [{ path: '/', title: '发现', icon: Odometer }]
+  const links = [{ path: '/', title: '首页', icon: Odometer }]
   if (enableSkinLibrary.value) links.push({ path: '/skin-library', title: '资源库', icon: Picture })
   if (isLogged.value) {
     links.push({ isDivider: true })

@@ -46,9 +46,20 @@ html.dark .hero-gradient-bg {
   font-weight: 600;
 }
 
+.el-button:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .el-button--primary {
-  background: linear-gradient(180deg, #4f9ad8 0%, #3e86c8 100%) !important;
-  border-color: #458ecf !important;
+  background: #2f78ba !important;
+  border-color: #296ca8 !important;
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background: #266aa6 !important;
+  border-color: #225e92 !important;
 }
 
 .el-input__wrapper,

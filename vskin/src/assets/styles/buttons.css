@@ -6,7 +6,7 @@
 }
 
 .btn-gradient {
-  border: none !important;
+  border: 1px solid transparent !important;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
@@ -14,21 +14,45 @@
   gap: 8px;
   color: #fff !important;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .btn-gradient:hover:not(:disabled) {
-  transform: translateY(-2px);
+  transform: none;
 }
 
-.btn-gradient-primary { background: linear-gradient(180deg, #7eb7df 0%, #5ea2d1 100%) !important; }
-.btn-gradient-primary:hover:not(:disabled) { box-shadow: 0 10px 22px rgba(94, 162, 209, 0.32); }
+.btn-gradient-primary {
+  background: #2f78ba !important;
+  border-color: #296ca8 !important;
+}
 
-.btn-gradient-success { background: linear-gradient(180deg, #77bb8d 0%, #5a9c74 100%) !important; }
-.btn-gradient-success:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(103, 194, 58, 0.4); }
+.btn-gradient-primary:hover:not(:disabled) {
+  background: #266aa6 !important;
+  border-color: #225e92 !important;
+  box-shadow: none;
+}
 
-.btn-gradient-danger { background: linear-gradient(180deg, #e88a8a 0%, #d96b6b 100%) !important; }
-.btn-gradient-danger:hover:not(:disabled) { box-shadow: 0 6px 16px rgba(245, 108, 108, 0.25); }
+.btn-gradient-success {
+  background: #2f8f61 !important;
+  border-color: #287a52 !important;
+}
+
+.btn-gradient-success:hover:not(:disabled) {
+  background: #287a52 !important;
+  border-color: #236a47 !important;
+  box-shadow: none;
+}
+
+.btn-gradient-danger {
+  background: #c95f5f !important;
+  border-color: #b05050 !important;
+}
+
+.btn-gradient-danger:hover:not(:disabled) {
+  background: #b05050 !important;
+  border-color: #954242 !important;
+  box-shadow: none;
+}
 
 .btn-soft-warning {
   color: var(--color-text);
@@ -38,10 +62,10 @@
 }
 .btn-soft-warning:hover {
   color: #fff !important;
-  background: linear-gradient(180deg, #f5c877 0%, #ebaf4c 100%) !important;
-  border-color: transparent !important;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(251,140,0,0.18);
+  background: #cb8f2d !important;
+  border-color: #b47c22 !important;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Iconic Switch Fix */
@@ -83,26 +107,26 @@
 
 /* Glass Buttons Hover */
 .btn-glass {
-  background: rgba(255, 255, 255, 0.12) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  color: #fff !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #f1f4f8 !important;
+  border: 1px solid #d3dbe6 !important;
+  color: #243242 !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .btn-glass:hover {
-  background: rgba(255, 255, 255, 0.2) !important;
-  border-color: rgba(255, 255, 255, 0.35) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  background: #e4eaf2 !important;
+  border-color: #c2cede !important;
+  transform: none;
+  box-shadow: none;
 }
 .btn-glass-primary {
-  background: rgba(64, 158, 255, 0.2) !important;
-  border: 1px solid rgba(64, 158, 255, 0.3) !important;
+  background: #2f78ba !important;
+  border: 1px solid #296ca8 !important;
+  color: #fff !important;
 }
 .btn-glass-primary:hover {
-  background: rgba(64, 158, 255, 0.35) !important;
-  box-shadow: 0 8px 32px rgba(64, 158, 255, 0.25);
+  background: #266aa6 !important;
+  border-color: #225e92 !important;
+  box-shadow: none;
 }
 
 /* Outline Buttons Hover */
@@ -115,10 +139,10 @@
   transition: all 0.3s ease;
 }
 .btn-outline:hover {
-  background: #eef6fd;
-  border-color: #9ec3e2;
-  color: #2b648f;
-  transform: translateY(-1px);
+  background: #e8edf4;
+  border-color: #b8c3d2;
+  color: #1d2733;
+  transform: none;
 }
 .btn-outline-danger {
   border-color: rgba(245, 108, 108, 0.4);

@@ -1,17 +1,30 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, inject, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { User } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 const router = useRouter()
+const user = inject('user', ref(null))
 const siteName = ref(localStorage.getItem('site_name_cache') || '皮肤站')
 const siteSubtitle = ref(localStorage.getItem('site_subtitle_cache') || '简洁、高效、现代的 Minecraft 皮肤管理站')
-const isLogged = ref(false)
+const isLogged = computed(() => !!user.value || !!localStorage.getItem('jwt'))
+const carouselCacheKey = 'home_carousel_cache_v1'
 const carouselImages = ref([])
 
+try {
+  const cached = localStorage.getItem(carouselCacheKey)
+  if (cached) {
+    const parsed = JSON.parse(cached)
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      carouselImages.value = parsed
+    }
+  }
+} catch (e) {
+  console.warn('Failed to parse cached carousel:', e)
+}
+
 onMounted(async () => {
-  // 加载站点配置
   try {
     const res = await axios.get('/public/settings')
     if (res.data.site_name) {
@@ -26,24 +39,14 @@ onMounted(async () => {
     console.warn('Failed to load site settings:', e)
   }
 
-  // 加载轮播图
   try {
     const res = await axios.get('/public/carousel')
-    carouselImages.value = res.data
+    if (Array.isArray(res.data)) {
+      carouselImages.value = res.data
+      localStorage.setItem(carouselCacheKey, JSON.stringify(res.data))
+    }
   } catch (e) {
     console.warn('Failed to load carousel images:', e)
-  }
-
-  // 检查登录状态
-  const jwt = localStorage.getItem('jwt')
-  if (jwt) {
-    try {
-      await axios.get('/me', { headers: { Authorization: 'Bearer ' + jwt } })
-      isLogged.value = true
-    } catch (e) {
-      localStorage.removeItem('jwt')
-      localStorage.removeItem('accessToken')
-    }
   }
 })
 
@@ -167,7 +170,7 @@ function getCarouselUrl(filename) {
 }
 
 .hero-actions { display: flex; gap: 16px; justify-content: center; }
-.hero-btn { height: 52px; padding: 0 36px; font-size: 16px; font-weight: 600; border-radius: 14px; }
+.hero-btn { height: 52px; padding: 0 36px; font-size: 16px; font-weight: 600; border-radius: 8px; }
 
 @media (max-width: 768px) {
   .hero-title { font-size: 36px; }
