@@ -75,6 +75,15 @@ class Config:
                     "interval": 5,
                 },
             },
+            "janus": {
+                "enabled": True,
+                "base_path": "/api/janus",
+                "issuer": "",
+                "union_api_base": "https://skin.mualliance.ltd/api/union",
+                "union_mode": "all",
+                "union_code": "",
+                "union_auto_sync": False,
+            },
             "rate_limit": {
                 "enabled": True,
                 "auth_attempts": 5,

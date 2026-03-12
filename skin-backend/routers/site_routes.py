@@ -504,4 +504,74 @@ def setup_routes(db: Database, site_backend, oauth_backend, rate_limiter, config
             },
         )
 
+    # ========== Embedded Janus Compatibility ==========
+
+    async def ensure_janus_enabled():
+        if not await oauth_backend._janus_enabled():
+            raise HTTPException(status_code=404, detail="janus is disabled")
+
+    async def ensure_janus_prefix(janus_prefix: str):
+        configured = await oauth_backend._janus_base_path()
+        incoming = "/" + str(janus_prefix or "").strip("/")
+        if len(incoming) > 1:
+            incoming = incoming.rstrip("/")
+        if incoming != configured:
+            raise HTTPException(status_code=404, detail="janus endpoint not found")
+
+    @router.get("/api/janus/.well-known/openid-configuration")
+    @router.get("/{janus_prefix:path}/.well-known/openid-configuration")
+    async def janus_openid_configuration(janus_prefix: str = "api/janus"):
+        await ensure_janus_prefix(janus_prefix)
+        return await oauth_backend.janus_openid_configuration()
+
+    @router.get("/api/janus/oauth/jwks")
+    @router.get("/{janus_prefix:path}/oauth/jwks")
+    async def janus_oauth_jwks(janus_prefix: str = "api/janus"):
+        await ensure_janus_enabled()
+        await ensure_janus_prefix(janus_prefix)
+        return oauth_backend.jwks()
+
+    @router.post("/api/janus/oauth/device/code")
+    @router.post("/{janus_prefix:path}/oauth/device/code")
+    async def janus_oauth_device_code(
+        client_id: int = Form(...),
+        scope: str = Form(default="openid offline_access Yggdrasil.PlayerProfiles.Select Yggdrasil.Server.Join"),
+        janus_prefix: str = "api/janus",
+    ):
+        await ensure_janus_enabled()
+        await ensure_janus_prefix(janus_prefix)
+        return await oauth_backend.create_device_authorization(client_id=client_id, scope=scope)
+
+    @router.post("/api/janus/oauth/token")
+    @router.post("/{janus_prefix:path}/oauth/token")
+    async def janus_oauth_token(
+        grant_type: str = Form(...),
+        code: str | None = Form(default=None),
+        client_id: int | None = Form(default=None),
+        client_secret: str | None = Form(default=None),
+        redirect_uri: str | None = Form(default=None),
+        device_code: str | None = Form(default=None),
+        refresh_token: str | None = Form(default=None),
+        janus_prefix: str = "api/janus",
+    ):
+        await ensure_janus_enabled()
+        await ensure_janus_prefix(janus_prefix)
+        return await oauth_backend.token_endpoint(
+            grant_type=grant_type,
+            code=code,
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=redirect_uri,
+            device_code=device_code,
+            refresh_token=refresh_token,
+        )
+
+    @router.get("/api/janus/oauth/userinfo")
+    @router.get("/{janus_prefix:path}/oauth/userinfo")
+    async def janus_oauth_userinfo(request: Request, janus_prefix: str = "api/janus"):
+        await ensure_janus_enabled()
+        await ensure_janus_prefix(janus_prefix)
+        access_token = get_oauth_bearer_token(request)
+        return await oauth_backend.get_userinfo(access_token)
+
     return router

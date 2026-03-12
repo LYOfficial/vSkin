@@ -81,6 +81,15 @@ def setup_routes(db: Database, admin_backend, oauth_backend, rate_limiter, confi
         await admin_backend.save_settings_group("email", body)
         return {"ok": True}
 
+    @router.get("/admin/settings/janus")
+    async def get_janus_settings(payload: dict = Depends(admin_required)):
+        return await admin_backend.get_janus_settings()
+
+    @router.post("/admin/settings/janus")
+    async def save_janus_settings(payload: dict = Depends(admin_required), body: dict = Body(...)):
+        await admin_backend.save_settings_group("janus", body)
+        return {"ok": True}
+
     @router.get("/admin/settings/fallback")
     async def get_fallback_settings(payload: dict = Depends(admin_required)):
         return await admin_backend.get_fallback_settings()

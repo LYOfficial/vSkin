@@ -289,12 +289,24 @@ async def test_oauth_device_flow_and_openid_metadata(client, admin_headers, auth
     assert openid_data["jwks_uri"].endswith("/oauth/jwks")
     assert openid_data["shared_client_id"] == str(app["app_id"])
 
+    janus_openid_resp = await client.get("/api/janus/.well-known/openid-configuration")
+    assert janus_openid_resp.status_code == 200
+    janus_openid_data = janus_openid_resp.json()
+    assert janus_openid_data["issuer"].endswith("/api/janus")
+    assert janus_openid_data["token_endpoint"].endswith("/api/janus/oauth/token")
+    assert janus_openid_data["device_authorization_endpoint"].endswith("/api/janus/oauth/device/code")
+    assert janus_openid_data["shared_client_id"] == str(app["app_id"])
+
+    janus_jwks_resp = await client.get("/api/janus/oauth/jwks")
+    assert janus_jwks_resp.status_code == 200
+    assert janus_jwks_resp.json()["keys"][0]["alg"] == "RS256"
+
     metadata_resp = await client.get("/")
     assert metadata_resp.status_code == 200
     assert metadata_resp.json()["meta"]["feature.openid_configuration_url"].endswith("/.well-known/openid-configuration")
 
     device_code_resp = await client.post(
-        "/oauth/device/code",
+        "/api/janus/oauth/device/code",
         data={
             "client_id": str(app["app_id"]),
             "scope": "openid offline_access Yggdrasil.PlayerProfiles.Select Yggdrasil.Server.Join",
@@ -313,7 +325,7 @@ async def test_oauth_device_flow_and_openid_metadata(client, admin_headers, auth
     assert preview_resp.json()["status"] == "pending"
 
     pending_token_resp = await client.post(
-        "/oauth/token",
+        "/api/janus/oauth/token",
         data={
             "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             "client_id": str(app["app_id"]),
@@ -335,7 +347,7 @@ async def test_oauth_device_flow_and_openid_metadata(client, admin_headers, auth
     assert approve_resp.json()["status"] == "approved"
 
     token_resp = await client.post(
-        "/oauth/token",
+        "/api/janus/oauth/token",
         data={
             "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             "client_id": str(app["app_id"]),
@@ -363,7 +375,7 @@ async def test_oauth_device_flow_and_openid_metadata(client, admin_headers, auth
     assert jwks_resp.json()["keys"][0]["alg"] == "RS256"
 
     refresh_resp = await client.post(
-        "/oauth/token",
+        "/api/janus/oauth/token",
         data={
             "grant_type": "refresh_token",
             "client_id": str(app["app_id"]),

@@ -269,6 +269,26 @@ def setup_routes(backend: YggdrasilBackend, db: Database, crypto, rate_limiter):
         site_name = await db.setting.get("site_name", "Yggdrasil 皮肤站")
         # 从config获取的是前端地址
         site_url = config.get("server.site_url", str(request.base_url)).rstrip("/")
+        api_url = config.get("server.api_url", "").rstrip("/")
+        janus_enabled = (await db.setting.get("janus_enabled", "true")).lower() == "true"
+        janus_base_path = str(await db.setting.get("janus_base_path", "/api/janus") or "/api/janus").strip()
+        if not janus_base_path.startswith("/"):
+            janus_base_path = "/" + janus_base_path
+        if len(janus_base_path) > 1:
+            janus_base_path = janus_base_path.rstrip("/")
+
+        janus_issuer = str(await db.setting.get("janus_issuer", "") or "").rstrip("/")
+        if not janus_issuer:
+            if api_url:
+                janus_issuer = f"{api_url}{janus_base_path}"
+            else:
+                janus_issuer = janus_base_path
+
+        openid_url = (
+            f"{janus_issuer}/.well-known/openid-configuration"
+            if janus_enabled
+            else (f"{api_url}/.well-known/openid-configuration" if api_url else None)
+        )
 
         # 读取公钥
         public_key_pem = crypto.get_public_key_pem()
@@ -284,7 +304,7 @@ def setup_routes(backend: YggdrasilBackend, db: Database, crypto, rate_limiter):
                     "register": f"{site_url}/register/" if site_url else None,
                 },
                 "feature.non_email_login": True,
-                "feature.openid_configuration_url": f"{config.get('server.api_url', '').rstrip('/')}/.well-known/openid-configuration" if config.get("server.api_url", "") else None,
+                "feature.openid_configuration_url": openid_url,
             },
             "skinDomains": await db.fallback.collect_skin_domains()
             + [

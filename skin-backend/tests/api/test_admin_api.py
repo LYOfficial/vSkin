@@ -34,6 +34,32 @@ async def test_api_admin_forbidden_for_normal_user(client, auth_headers):
     resp = await client.get("/admin/users", headers={"Authorization": auth_headers["Authorization"]})
     assert resp.status_code == 403
 
+
+@pytest.mark.asyncio
+async def test_api_admin_settings_janus(client, admin_headers):
+    payload = {
+        "janus_enabled": True,
+        "janus_base_path": "/api/janus",
+        "janus_union_mode": "only",
+        "janus_union_code": "SJMC_FDC_MUA",
+    }
+    resp = await client.post(
+        "/admin/settings/janus",
+        json=payload,
+        headers={"Authorization": admin_headers["Authorization"]},
+    )
+    assert resp.status_code == 200
+
+    get_resp = await client.get(
+        "/admin/settings/janus",
+        headers={"Authorization": admin_headers["Authorization"]},
+    )
+    assert get_resp.status_code == 200
+    data = get_resp.json()
+    assert data["janus_base_path"] == "/api/janus"
+    assert data["janus_union_mode"] == "only"
+    assert data["janus_union_code"] == "SJMC_FDC_MUA"
+
 @pytest.mark.asyncio
 async def test_api_admin_ban_user(client, admin_headers, user_factory):
     """测试管理员封禁用户接口"""

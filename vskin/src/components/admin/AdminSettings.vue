@@ -257,6 +257,60 @@
         </el-form-item>
       </el-form>
     </el-card>
+
+    <el-card class="surface-card mb-6" shadow="never">
+      <template #header>
+        <div class="card-header-flex">
+          <div class="title-group">
+            <el-icon><Connection /></el-icon>
+            <span>联合认证 / Janus</span>
+          </div>
+          <el-button type="primary" size="small" @click="saveGroup('janus')" :loading="saving.janus" class="hover-lift">保存</el-button>
+        </div>
+      </template>
+      <el-form label-position="top" :model="settings.janus">
+        <el-row :gutter="20">
+          <el-col :xs="24" :sm="8">
+            <el-form-item label="启用内置 Janus">
+              <el-switch v-model="settings.janus.janus_enabled" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="16">
+            <el-form-item label="Janus 基础路径">
+              <el-input v-model="settings.janus.janus_base_path" placeholder="/api/janus" />
+              <p class="hint-text">默认使用 /api/janus，无需额外运行 Janus 服务进程。</p>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="OpenID Issuer (可选)">
+          <el-input v-model="settings.janus.janus_issuer" placeholder="留空自动使用 {api_url}{base_path}" />
+        </el-form-item>
+        <el-divider />
+        <el-form-item label="Union API 基址">
+          <el-input v-model="settings.janus.janus_union_api_base" placeholder="https://skin.mualliance.ltd/api/union" />
+        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :xs="24" :sm="8">
+            <el-form-item label="Union 模式">
+              <el-select v-model="settings.janus.janus_union_mode" placeholder="请选择模式">
+                <el-option label="全部成员 (all)" value="all" />
+                <el-option label="白名单模式 (only)" value="only" />
+                <el-option label="黑名单模式 (excludes)" value="excludes" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="16">
+            <el-form-item label="Union 代码 (可选)">
+              <el-input v-model="settings.janus.janus_union_code" placeholder="例如 SJMC_FDC_MUA" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="自动同步开关">
+          <el-switch v-model="settings.janus.janus_union_auto_sync" />
+          <span class="hint-text ml-4">预留配置项，便于后续对接 Union 数据同步任务。</span>
+        </el-form-item>
+      </el-form>
+    </el-card>
   </div>
 </template>
 
@@ -266,7 +320,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import AdminCarousel from './AdminCarousel.vue'
 import { 
-  Refresh, Setting, Monitor, Lock, Key, Link, PictureFilled, Upload
+  Refresh, Setting, Monitor, Lock, Key, Link, PictureFilled, Upload, Connection
 } from '@element-plus/icons-vue'
 
 const settings = reactive({
@@ -300,6 +354,15 @@ const settings = reactive({
     microsoft_client_id: '',
     microsoft_client_secret: '',
     microsoft_redirect_uri: ''
+  },
+  janus: {
+    janus_enabled: true,
+    janus_base_path: '/api/janus',
+    janus_issuer: '',
+    janus_union_api_base: 'https://skin.mualliance.ltd/api/union',
+    janus_union_mode: 'all',
+    janus_union_code: '',
+    janus_union_auto_sync: false,
   }
 })
 
@@ -307,7 +370,8 @@ const saving = reactive({
   site: false,
   security: false,
   auth: false,
-  microsoft: false
+  microsoft: false,
+  janus: false,
 })
 
 const regulatoryCollapse = ref([])
@@ -339,7 +403,8 @@ async function loadAllSettings() {
     loadGroup('site'),
     loadGroup('security'),
     loadGroup('auth'),
-    loadGroup('microsoft')
+    loadGroup('microsoft'),
+    loadGroup('janus'),
   ])
 }
 

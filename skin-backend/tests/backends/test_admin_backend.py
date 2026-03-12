@@ -29,6 +29,19 @@ async def test_admin_settings_management(db_session, test_config):
     await backend.save_settings_group("security", security_settings)
     assert (await backend.get_security_settings())["rate_limit_auth_attempts"] == 10
 
+    janus_settings = {
+        "janus_enabled": True,
+        "janus_base_path": "api/janus",
+        "janus_union_mode": "excludes",
+        "janus_union_code": "ABC_DEF",
+    }
+    await backend.save_settings_group("janus", janus_settings)
+    janus_fetched = await backend.get_janus_settings()
+    assert janus_fetched["janus_enabled"] is True
+    assert janus_fetched["janus_base_path"] == "/api/janus"
+    assert janus_fetched["janus_union_mode"] == "excludes"
+    assert janus_fetched["janus_union_code"] == "ABC_DEF"
+
 @pytest.mark.asyncio
 async def test_admin_user_controls(db_session, test_config, user_factory):
     """测试管理员对用户的管控逻辑：列表、封禁、删除、权限切换"""

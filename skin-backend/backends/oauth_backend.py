@@ -81,6 +81,13 @@ class OAuthBackend:
     def _site_url(self) -> str:
         return str(self.config.get("server.site_url", "")).rstrip("/")
 
+    def _normalize_path_prefix(self, value: str, default: str = "") -> str:
+        raw = str(value or default or "").strip()
+        if not raw:
+            return ""
+        normalized = "/" + raw.strip("/")
+        return "" if normalized == "/" else normalized
+
     def _api_url(self) -> str:
         api_url = str(self.config.get("server.api_url", "")).rstrip("/")
         if api_url:
@@ -93,6 +100,38 @@ class OAuthBackend:
 
     def _issuer(self) -> str:
         return self._api_url() or self._site_url()
+
+    async def _janus_enabled(self) -> bool:
+        value = await self.db.setting.get("janus_enabled", None)
+        if value is None:
+            return bool(self.config.get("janus.enabled", True))
+        return str(value).lower() == "true"
+
+    async def _janus_base_path(self) -> str:
+        value = await self.db.setting.get("janus_base_path", None)
+        fallback = str(self.config.get("janus.base_path", "/api/janus") or "/api/janus")
+        return self._normalize_path_prefix(value, fallback) or "/api/janus"
+
+    async def _janus_issuer(self) -> str:
+        custom_issuer = (await self._get_setting_text("janus_issuer", "")).rstrip("/")
+        if custom_issuer:
+            return custom_issuer
+        api_url = self._api_url().rstrip("/")
+        base_path = await self._janus_base_path()
+        if api_url:
+            return f"{api_url}{base_path}"
+        return base_path
+
+    async def _janus_union_payload(self) -> dict:
+        mode = (await self._get_setting_text("janus_union_mode", "all")).strip().lower() or "all"
+        if mode not in {"all", "only", "excludes"}:
+            mode = "all"
+        return {
+            "api_base": await self._get_setting_text("janus_union_api_base", str(self.config.get("janus.union_api_base", "https://skin.mualliance.ltd/api/union") or "https://skin.mualliance.ltd/api/union")),
+            "mode": mode,
+            "code": await self._get_setting_text("janus_union_code", ""),
+            "auto_sync": (await self._get_setting_text("janus_union_auto_sync", "false")).lower() == "true",
+        }
 
     def _verification_uri(self) -> str:
         site_url = self._site_url()
@@ -360,6 +399,8 @@ class OAuthBackend:
                 api_url = site_url
         sample_redirect = "https://your-app.example.com/oauth/callback"
         device_settings = await self._device_settings_payload()
+        janus_base_path = await self._janus_base_path()
+        janus_issuer = await self._janus_issuer()
         return {
             "authorize_endpoint": f"{site_url}/oauth/authorize" if site_url else "/oauth/authorize",
             "token_endpoint": f"{api_url}/oauth/token" if api_url else "/oauth/token",
@@ -372,6 +413,16 @@ class OAuthBackend:
             "skin_endpoint": f"{api_url}/oauth/skin" if api_url else "/oauth/skin",
             "sample_redirect_uri": sample_redirect,
             "device_settings": device_settings,
+            "janus": {
+                "enabled": await self._janus_enabled(),
+                "base_path": janus_base_path,
+                "issuer": janus_issuer,
+                "openid_configuration_url": f"{janus_issuer}/.well-known/openid-configuration" if janus_issuer else f"{janus_base_path}/.well-known/openid-configuration",
+                "token_endpoint": f"{janus_issuer}/oauth/token" if janus_issuer else f"{janus_base_path}/oauth/token",
+                "device_authorization_endpoint": f"{janus_issuer}/oauth/device/code" if janus_issuer else f"{janus_base_path}/oauth/device/code",
+                "jwks_uri": f"{janus_issuer}/oauth/jwks" if janus_issuer else f"{janus_base_path}/oauth/jwks",
+                "verification_uri": self._verification_uri(),
+            },
         }
 
     async def openid_configuration(self) -> dict:
@@ -381,9 +432,54 @@ class OAuthBackend:
 
         payload = {
             "issuer": issuer,
+            "authorization_endpoint": f"{issuer}/oauth/authorize/check",
             "device_authorization_endpoint": f"{issuer}/oauth/device/code",
             "token_endpoint": f"{issuer}/oauth/token",
             "jwks_uri": f"{issuer}/oauth/jwks",
+            "userinfo_endpoint": f"{issuer}/oauth/userinfo",
+            "response_types_supported": ["code"],
+            "grant_types_supported": [
+                "authorization_code",
+                "refresh_token",
+                "urn:ietf:params:oauth:grant-type:device_code",
+            ],
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["RS256"],
+            "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+            "claims_supported": ["sub", "preferred_username", "selectedProfile"],
+            "scopes_supported": list(self.SUPPORTED_SCOPES.keys()),
+        }
+        shared_client_id = await self._shared_client_id()
+        if shared_client_id is not None:
+            payload["shared_client_id"] = str(shared_client_id)
+        return payload
+
+    async def janus_openid_configuration(self) -> dict:
+        if not await self._janus_enabled():
+            raise HTTPException(status_code=404, detail="janus is disabled")
+
+        issuer = await self._janus_issuer()
+        payload = {
+            "issuer": issuer,
+            "authorization_endpoint": f"{issuer}/oauth/authorize/check",
+            "device_authorization_endpoint": f"{issuer}/oauth/device/code",
+            "token_endpoint": f"{issuer}/oauth/token",
+            "jwks_uri": f"{issuer}/oauth/jwks",
+            "userinfo_endpoint": f"{issuer}/oauth/userinfo",
+            "response_types_supported": ["code"],
+            "grant_types_supported": [
+                "authorization_code",
+                "refresh_token",
+                "urn:ietf:params:oauth:grant-type:device_code",
+            ],
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["RS256"],
+            "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+            "claims_supported": ["sub", "preferred_username", "selectedProfile"],
+            "scopes_supported": list(self.SUPPORTED_SCOPES.keys()),
+            "verification_uri": self._verification_uri(),
+            "janus_base_path": await self._janus_base_path(),
+            "union": await self._janus_union_payload(),
         }
         shared_client_id = await self._shared_client_id()
         if shared_client_id is not None:

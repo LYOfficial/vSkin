@@ -97,6 +97,28 @@ class AdminBackend:
             "email_template_html": s.get("email_template_html", ""),
         }
 
+    async def get_janus_settings(self):
+        s = await self.db.setting.get_all()
+        base_path = str(s.get("janus_base_path", "/api/janus") or "/api/janus").strip()
+        if not base_path.startswith("/"):
+            base_path = "/" + base_path
+        if len(base_path) > 1:
+            base_path = base_path.rstrip("/")
+
+        union_mode = str(s.get("janus_union_mode", "all") or "all").strip().lower()
+        if union_mode not in {"all", "only", "excludes"}:
+            union_mode = "all"
+
+        return {
+            "janus_enabled": s.get("janus_enabled", "true") == "true",
+            "janus_base_path": base_path,
+            "janus_issuer": s.get("janus_issuer", ""),
+            "janus_union_api_base": s.get("janus_union_api_base", "https://skin.mualliance.ltd/api/union"),
+            "janus_union_mode": union_mode,
+            "janus_union_code": s.get("janus_union_code", ""),
+            "janus_union_auto_sync": s.get("janus_union_auto_sync", "false") == "true",
+        }
+
     async def get_fallback_settings(self):
         s = await self.db.setting.get_all()
         return {
@@ -127,7 +149,16 @@ class AdminBackend:
             "auth": ["jwt_expire_days"],
             "microsoft": ["microsoft_client_id", "microsoft_client_secret", "microsoft_redirect_uri"],
             "email": ["email_verify_enabled", "email_verify_ttl", "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_ssl", "smtp_sender", "email_template_html"],
-            "fallback": ["fallback_strategy"]
+            "fallback": ["fallback_strategy"],
+            "janus": [
+                "janus_enabled",
+                "janus_base_path",
+                "janus_issuer",
+                "janus_union_api_base",
+                "janus_union_mode",
+                "janus_union_code",
+                "janus_union_auto_sync",
+            ],
         }
         
         if group not in allowed_keys and group != "fallback_endpoints":
@@ -169,6 +200,22 @@ class AdminBackend:
                             if item.strip()
                         ]
                     val = ",".join(parts)
+
+                if key == "janus_base_path":
+                    val = str(val or "/api/janus").strip() or "/api/janus"
+                    if not val.startswith("/"):
+                        val = "/" + val
+                    if len(val) > 1:
+                        val = val.rstrip("/")
+
+                if key == "janus_union_mode":
+                    mode = str(val or "all").strip().lower()
+                    if mode not in {"all", "only", "excludes"}:
+                        raise HTTPException(status_code=400, detail="janus_union_mode must be all/only/excludes")
+                    val = mode
+
+                if key in {"janus_issuer", "janus_union_api_base"}:
+                    val = str(val or "").strip()
                 
                 value = "true" if isinstance(val, bool) and val else ("false" if isinstance(val, bool) else str(val))
                 await self.db.setting.set(key, value)
@@ -185,13 +232,14 @@ class AdminBackend:
         sec = await self.get_security_settings()
         auth = await self.get_auth_settings()
         ms = await self.get_microsoft_settings()
+        janus = await self.get_janus_settings()
         fallback = await self.get_fallback_settings()
         email = await self.get_email_settings()
-        return {**site, **sec, **auth, **ms, **fallback, **email}
+        return {**site, **sec, **auth, **ms, **janus, **fallback, **email}
 
     async def save_admin_settings(self, body: dict):
         # Determine which groups are present and save them
-        for group in ["site", "security", "auth", "microsoft", "email", "fallback"]:
+        for group in ["site", "security", "auth", "microsoft", "janus", "email", "fallback"]:
             await self.save_settings_group(group, body)
         if "fallbacks" in body:
             await self.save_settings_group("fallback_endpoints", body)

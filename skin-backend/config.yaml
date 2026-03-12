@@ -32,6 +32,16 @@ server:
   api_url: "http://localhost:8000"  # 后端 API 外部访问地址 (用于 Yggdrasil 材质 URL)
   debug: true  # 开启后会输出所有HTTP请求和响应的详细信息（包括图片请求），用于调试
 
+# 内置 Janus（Yggdrasil Connect / OIDC）配置
+janus:
+  enabled: true
+  base_path: "/api/janus"  # 无需额外进程，Janus 兼容接口直接挂载在当前后端
+  issuer: ""  # 为空时自动推导为 {api_url}{base_path}
+  union_api_base: "https://skin.mualliance.ltd/api/union"
+  union_mode: "all"        # all / only / excludes
+  union_code: ""           # only/excludes 模式下可填写皮肤站缩写白黑名单代码
+  union_auto_sync: false
+
 # CORS 跨域配置
 cors:
   # 开发环境允许所有来源
