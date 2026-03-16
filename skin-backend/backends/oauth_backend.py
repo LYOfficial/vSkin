@@ -191,31 +191,82 @@ class OAuthBackend:
             5,
         )
 
+    def _parse_shared_client_ids(self, value) -> list[int]:
+        if value in (None, ""):
+            return []
+
+        if isinstance(value, (list, tuple, set)):
+            chunks = list(value)
+        else:
+            chunks = str(value).split(",")
+
+        result: list[int] = []
+        for chunk in chunks:
+            try:
+                final = int(str(chunk).strip())
+            except (TypeError, ValueError):
+                continue
+            if final > 0 and final not in result:
+                result.append(final)
+        return result
+
+    async def _shared_client_ids(self) -> list[int]:
+        value = await self.db.setting.get("oauth_device_shared_client_ids", None)
+        final = self._parse_shared_client_ids(value)
+        if final:
+            return final
+
+        legacy_value = await self.db.setting.get("oauth_device_shared_client_id", None)
+        final = self._parse_shared_client_ids(legacy_value)
+        if final:
+            return final
+
+        config_value = self.config.get("oauth.device.shared_client_ids", [])
+        final = self._parse_shared_client_ids(config_value)
+        if final:
+            return final
+
+        return self._parse_shared_client_ids(self.config.get("oauth.device.shared_client_id", ""))
+
     async def _shared_client_id(self) -> int | None:
-        value = await self.db.setting.get("oauth_device_shared_client_id", None)
-        if value in (None, ""):
-            value = self.config.get("oauth.device.shared_client_id", "")
-        if value in (None, ""):
-            return None
-        try:
-            final = int(value)
-        except (TypeError, ValueError):
-            return None
-        return final if final > 0 else None
+        shared_client_ids = await self._shared_client_ids()
+        return shared_client_ids[0] if shared_client_ids else None
+
+    async def _is_shared_client(self, client_id: int) -> bool:
+        return int(client_id) in set(await self._shared_client_ids())
 
     async def _device_default_redirect_uri(self) -> str:
         return await self._get_setting_text("oauth_device_default_redirect_uri", "https://oauth.ustb.world/")
 
     async def _device_settings_payload(self) -> dict:
+        shared_client_ids = await self._shared_client_ids()
         return {
-            "shared_client_id": await self._shared_client_id(),
+            "shared_client_id": shared_client_ids[0] if shared_client_ids else None,
+            "shared_client_ids": shared_client_ids,
             "expires_in": await self._device_expires_in(),
             "interval": await self._device_interval(),
             "default_redirect_uri": await self._device_default_redirect_uri(),
         }
 
+    async def _set_shared_client_ids(self, app_ids: list[int]):
+        final_ids = self._parse_shared_client_ids(app_ids)
+        payload = ",".join(str(app_id) for app_id in final_ids)
+        legacy = str(final_ids[0]) if final_ids else ""
+        await self.db.setting.set("oauth_device_shared_client_ids", payload)
+        await self.db.setting.set("oauth_device_shared_client_id", legacy)
+
     async def _set_shared_client_id(self, app_id: int | None):
-        await self.db.setting.set("oauth_device_shared_client_id", "" if app_id is None else str(int(app_id)))
+        await self._set_shared_client_ids([] if app_id is None else [app_id])
+
+    async def _add_shared_client_id(self, app_id: int):
+        shared_client_ids = await self._shared_client_ids()
+        if int(app_id) not in shared_client_ids:
+            shared_client_ids.append(int(app_id))
+            await self._set_shared_client_ids(shared_client_ids)
+
+    async def _remove_shared_client_id(self, app_id: int):
+        shared_client_ids = [item for item in await self._shared_client_ids() if int(item) != int(app_id)]
+        await self._set_shared_client_ids(shared_client_ids)
 
     def _avatar_url_from_hash(self, avatar_hash: str | None) -> str:
         site = self._site_url()
@@ -341,10 +392,10 @@ class OAuthBackend:
 
     async def list_apps(self) -> list[dict]:
         rows = await self.db.oauth.list_clients()
-        shared_client_id = await self._shared_client_id()
+        shared_client_ids = set(await self._shared_client_ids())
         default_redirect_uri = await self._device_default_redirect_uri()
         for row in rows:
-            row["is_device_shared_client"] = bool(shared_client_id and int(row["app_id"]) == int(shared_client_id))
+            row["is_device_shared_client"] = int(row["app_id"]) in shared_client_ids
             row["can_use_for_device_flow"] = True
             row["recommended_device_redirect_uri"] = default_redirect_uri
         return rows
@@ -355,7 +406,7 @@ class OAuthBackend:
         secret = self._make_secret()
         app_id = await self.db.oauth.create_client(final_name, self._hash_secret(secret), final_redirect_uri)
         if set_as_device_shared_client:
-            await self._set_shared_client_id(app_id)
+            await self._add_shared_client_id(app_id)
         return {
             "app_id": app_id,
             "client_name": final_name,
@@ -372,11 +423,9 @@ class OAuthBackend:
         if not updated:
             raise HTTPException(status_code=404, detail="oauth app not found")
         if set_as_device_shared_client is True:
-            await self._set_shared_client_id(app_id)
+            await self._add_shared_client_id(app_id)
         elif set_as_device_shared_client is False:
-            current_shared_client_id = await self._shared_client_id()
-            if current_shared_client_id is not None and int(current_shared_client_id) == int(app_id):
-                await self._set_shared_client_id(None)
+            await self._remove_shared_client_id(app_id)
         return {"ok": True}
 
     async def reset_app_secret(self, app_id: int) -> dict:
@@ -395,10 +444,8 @@ class OAuthBackend:
         app = await self.db.oauth.get_client(app_id)
         if not app:
             raise HTTPException(status_code=404, detail="oauth app not found")
-        shared_client_id = await self._shared_client_id()
         await self.db.oauth.delete_client(app_id)
-        if shared_client_id is not None and int(shared_client_id) == int(app_id):
-            await self._set_shared_client_id(None)
+        await self._remove_shared_client_id(app_id)
         return {"ok": True}
 
     async def admin_meta(self) -> dict:
@@ -462,9 +509,10 @@ class OAuthBackend:
             "claims_supported": ["sub", "preferred_username", "selectedProfile"],
             "scopes_supported": list(self.SUPPORTED_SCOPES.keys()),
         }
-        shared_client_id = await self._shared_client_id()
-        if shared_client_id is not None:
-            payload["shared_client_id"] = str(shared_client_id)
+        shared_client_ids = [str(item) for item in await self._shared_client_ids()]
+        if shared_client_ids:
+            payload["shared_client_id"] = shared_client_ids[0]
+            payload["shared_client_ids"] = shared_client_ids
         return payload
 
     async def janus_openid_configuration(self) -> dict:
@@ -494,27 +542,32 @@ class OAuthBackend:
             "janus_base_path": await self._janus_base_path(),
             "union": await self._janus_union_payload(),
         }
-        shared_client_id = await self._shared_client_id()
-        if shared_client_id is not None:
-            payload["shared_client_id"] = str(shared_client_id)
+        shared_client_ids = [str(item) for item in await self._shared_client_ids()]
+        if shared_client_ids:
+            payload["shared_client_id"] = shared_client_ids[0]
+            payload["shared_client_ids"] = shared_client_ids
         return payload
 
     async def get_admin_device_settings(self) -> dict:
         return await self._device_settings_payload()
 
     async def save_admin_device_settings(self, body: dict) -> dict:
-        shared_client_id = body.get("shared_client_id")
-        if shared_client_id in (None, ""):
-            await self._set_shared_client_id(None)
+        shared_client_ids = body.get("shared_client_ids", None)
+        if shared_client_ids is None:
+            legacy_shared_client_id = body.get("shared_client_id")
+            if legacy_shared_client_id in (None, ""):
+                final_shared_client_ids: list[int] = []
+            else:
+                final_shared_client_ids = self._parse_shared_client_ids([legacy_shared_client_id])
         else:
-            try:
-                final_shared_client_id = int(shared_client_id)
-            except (TypeError, ValueError):
-                raise HTTPException(status_code=400, detail="shared_client_id invalid")
-            app = await self.db.oauth.get_client(final_shared_client_id)
+            final_shared_client_ids = self._parse_shared_client_ids(shared_client_ids)
+
+        for app_id in final_shared_client_ids:
+            app = await self.db.oauth.get_client(app_id)
             if not app:
                 raise HTTPException(status_code=404, detail="oauth app not found")
-            await self._set_shared_client_id(final_shared_client_id)
+
+        await self._set_shared_client_ids(final_shared_client_ids)
 
         expires_in = body.get("expires_in")
         if expires_in is not None:
@@ -603,11 +656,11 @@ class OAuthBackend:
         return app
 
     async def _require_shared_client(self, client_id: int) -> dict:
-        shared_client_id = await self._shared_client_id()
-        if shared_client_id is None:
-            raise OAuthProtocolError("invalid_client", "shared_client_id is not configured", status_code=503)
-        if int(client_id) != int(shared_client_id):
-            raise OAuthProtocolError("invalid_client", "client_id does not match shared_client_id", status_code=401)
+        shared_client_ids = await self._shared_client_ids()
+        if not shared_client_ids:
+            raise OAuthProtocolError("invalid_client", "shared_client_ids are not configured", status_code=503)
+        if int(client_id) not in set(shared_client_ids):
+            raise OAuthProtocolError("invalid_client", "client_id is not configured for device flow", status_code=401)
         return await self._get_client_or_error(client_id)
 
     def _validate_client_secret(self, app: dict, client_secret: str | None):
@@ -929,8 +982,7 @@ class OAuthBackend:
         if not app:
             raise OAuthProtocolError("invalid_client", "invalid client", status_code=401)
 
-        shared_client_id = await self._shared_client_id()
-        if shared_client_id is None or int(client_id) != int(shared_client_id):
+        if not await self._is_shared_client(client_id):
             self._validate_client_secret(app, client_secret)
 
         record = await self.db.oauth.get_refresh_token(refresh_token)

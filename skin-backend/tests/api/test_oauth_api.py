@@ -43,6 +43,67 @@ async def test_admin_manage_oauth_apps(client, admin_headers):
     device_settings_resp = await client.get("/admin/oauth/device-settings", headers=headers)
     assert device_settings_resp.status_code == 200
     assert device_settings_resp.json()["shared_client_id"] == created["app_id"]
+    assert device_settings_resp.json()["shared_client_ids"] == [created["app_id"]]
+
+
+@pytest.mark.asyncio
+async def test_admin_oauth_device_settings_support_multiple_shared_clients(client, admin_headers):
+    headers = {"Authorization": admin_headers["Authorization"]}
+
+    app_a_resp = await client.post(
+        "/admin/oauth/apps",
+        json={
+            "client_name": "Launcher A",
+            "redirect_uri": "https://launcher-a.example.com/callback",
+        },
+        headers=headers,
+    )
+    assert app_a_resp.status_code == 200
+    app_a = app_a_resp.json()
+
+    app_b_resp = await client.post(
+        "/admin/oauth/apps",
+        json={
+            "client_name": "Launcher B",
+            "redirect_uri": "https://launcher-b.example.com/callback",
+        },
+        headers=headers,
+    )
+    assert app_b_resp.status_code == 200
+    app_b = app_b_resp.json()
+
+    save_resp = await client.post(
+        "/admin/oauth/device-settings",
+        json={
+            "shared_client_ids": [app_a["app_id"], app_b["app_id"]],
+            "expires_in": 900,
+            "interval": 5,
+            "default_redirect_uri": "https://oauth.ustb.world/",
+        },
+        headers=headers,
+    )
+    assert save_resp.status_code == 200
+    payload = save_resp.json()
+    assert payload["shared_client_id"] == app_a["app_id"]
+    assert payload["shared_client_ids"] == [app_a["app_id"], app_b["app_id"]]
+
+    apps_resp = await client.get("/admin/oauth/apps", headers=headers)
+    assert apps_resp.status_code == 200
+    apps = {item["app_id"]: item for item in apps_resp.json()}
+    assert apps[app_a["app_id"]]["is_device_shared_client"] is True
+    assert apps[app_b["app_id"]]["is_device_shared_client"] is True
+
+    openid_resp = await client.get("/.well-known/openid-configuration")
+    assert openid_resp.status_code == 200
+    openid_data = openid_resp.json()
+    assert openid_data["shared_client_id"] == str(app_a["app_id"])
+    assert openid_data["shared_client_ids"] == [str(app_a["app_id"]), str(app_b["app_id"])]
+
+    janus_openid_resp = await client.get("/api/janus/.well-known/openid-configuration")
+    assert janus_openid_resp.status_code == 200
+    janus_openid_data = janus_openid_resp.json()
+    assert janus_openid_data["shared_client_id"] == str(app_a["app_id"])
+    assert janus_openid_data["shared_client_ids"] == [str(app_a["app_id"]), str(app_b["app_id"])]
 
 
 @pytest.mark.asyncio
@@ -279,6 +340,7 @@ async def test_oauth_device_flow_and_openid_metadata(client, admin_headers, auth
     device_settings_resp = await client.get("/admin/oauth/device-settings", headers=admin_h)
     assert device_settings_resp.status_code == 200
     assert device_settings_resp.json()["shared_client_id"] == app["app_id"]
+    assert device_settings_resp.json()["shared_client_ids"] == [app["app_id"]]
     assert device_settings_resp.json()["default_redirect_uri"] == "https://oauth.ustb.world/"
 
     openid_resp = await client.get("/.well-known/openid-configuration")
@@ -288,6 +350,7 @@ async def test_oauth_device_flow_and_openid_metadata(client, admin_headers, auth
     assert openid_data["token_endpoint"].endswith("/oauth/token")
     assert openid_data["jwks_uri"].endswith("/oauth/jwks")
     assert openid_data["shared_client_id"] == str(app["app_id"])
+    assert openid_data["shared_client_ids"] == [str(app["app_id"])]
 
     janus_openid_resp = await client.get("/api/janus/.well-known/openid-configuration")
     assert janus_openid_resp.status_code == 200
@@ -296,6 +359,7 @@ async def test_oauth_device_flow_and_openid_metadata(client, admin_headers, auth
     assert janus_openid_data["token_endpoint"].endswith("/api/janus/oauth/token")
     assert janus_openid_data["device_authorization_endpoint"].endswith("/api/janus/oauth/device/code")
     assert janus_openid_data["shared_client_id"] == str(app["app_id"])
+    assert janus_openid_data["shared_client_ids"] == [str(app["app_id"])]
     union_meta = janus_openid_data.get("union", {})
     assert union_meta.get("database_sovereignty") == "local_only"
     assert union_meta.get("external_write_protection") is True

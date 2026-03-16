@@ -268,7 +268,7 @@ server {
 2. 点击“新增授权设备应用”，默认会创建一个名为“授权设备”的应用，并自动勾选“设为授权设备共享客户端”。
 3. 默认回调 URL 可以直接用 `https://oauth.ustb.world/`。
 4. 这个回调 URL 在设备授权流里不会被实际访问，也不会发生浏览器回调；它只需要是一个合法的 http(s) 地址，用来满足 OAuth 应用字段校验。
-5. 如果你已经有现成的 OAuth 应用，也可以在列表里直接点击“设为授权设备”，把它指定为当前 shared client。
+5. 如果你已经有现成的 OAuth 应用，也可以在列表里直接点击“加入设备授权”，把它加入当前 shared clients 列表。
 6. 同一页面还可以设置设备码有效期和轮询间隔，保存后立即生效。
 
 以 USTBL 为例，可使用以下地址：
@@ -280,7 +280,7 @@ server {
 * JWKS 端点：`https://你的域名/skinapi/oauth/jwks`
 * 浏览器授权页：`https://你的域名/device`
 
-设备流客户端通常不需要你在外部手填固定 `client_id`，而是会从 OpenID 配置中的 `shared_client_id` 读取；这个值由后台「OAuth 应用」页当前选中的“授权设备共享客户端”自动决定。
+设备流客户端通常不需要你在外部手填固定 `client_id`，而是会从 OpenID 配置中的 `shared_client_id` 或 `shared_client_ids` 读取；这些值由后台「OAuth 应用」页当前选中的“授权设备共享客户端”列表自动决定。为兼容旧客户端，接口仍会返回单个 `shared_client_id`，其值等于列表中的第一个客户端。
 
 推荐 scope：
 

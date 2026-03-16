@@ -68,9 +68,10 @@
         <div class="meta-grid">
           <div class="meta-item">
             <div class="meta-label">授权设备共享客户端</div>
-            <el-select v-model="deviceSettings.shared_client_id" clearable placeholder="选择一个 OAuth 应用作为 shared_client_id">
+            <el-select v-model="deviceSettings.shared_client_ids" multiple clearable collapse-tags collapse-tags-tooltip placeholder="选择可用于设备授权流的 OAuth 应用">
               <el-option v-for="app in apps" :key="app.app_id" :label="`${app.app_id} - ${app.client_name || '未命名应用'}`" :value="app.app_id" />
             </el-select>
+            <p class="hint-text">这里允许选择多个客户端。OpenID 配置会保留兼容字段 shared_client_id，同时新增 shared_client_ids。</p>
           </div>
           <div class="meta-item">
             <div class="meta-label">设备码有效期（秒）</div>
@@ -113,7 +114,7 @@
         <el-table-column prop="redirect_uri" label="回调 URL" min-width="280" />
         <el-table-column label="操作" width="360" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="success" plain @click="setSharedClient(row)" :disabled="row.is_device_shared_client">设为授权设备</el-button>
+            <el-button size="small" type="success" plain @click="toggleSharedClient(row)">{{ row.is_device_shared_client ? '移出设备授权' : '加入设备授权' }}</el-button>
             <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
             <el-button size="small" type="warning" @click="resetSecret(row)">重置 Secret</el-button>
             <el-button size="small" type="danger" @click="removeApp(row)">删除</el-button>
@@ -172,6 +173,7 @@ const meta = reactive({
 })
 
 const deviceSettings = reactive({
+  shared_client_ids: [],
   shared_client_id: null,
   expires_in: 900,
   interval: 5,
@@ -194,6 +196,26 @@ const form = reactive({
 
 const authHeaders = () => ({ Authorization: 'Bearer ' + localStorage.getItem('jwt') })
 
+function normalizeDeviceSettings(payload) {
+  const sharedIds = Array.isArray(payload?.shared_client_ids)
+    ? payload.shared_client_ids.map(item => Number(item)).filter(item => Number.isInteger(item) && item > 0)
+    : payload?.shared_client_id
+      ? [Number(payload.shared_client_id)].filter(item => Number.isInteger(item) && item > 0)
+      : []
+
+  return {
+    shared_client_ids: [...new Set(sharedIds)],
+    shared_client_id: sharedIds[0] ?? null,
+    expires_in: Number(payload?.expires_in) || 900,
+    interval: Number(payload?.interval) || 5,
+    default_redirect_uri: payload?.default_redirect_uri || 'https://oauth.ustb.world/',
+  }
+}
+
+function isDeviceSharedClient(appId) {
+  return deviceSettings.shared_client_ids.includes(Number(appId))
+}
+
 async function loadData() {
   try {
     const [metaRes, appsRes, deviceSettingsRes] = await Promise.all([
@@ -203,7 +225,7 @@ async function loadData() {
     ])
     Object.assign(meta, metaRes.data || {})
     apps.value = (appsRes.data || []).sort((a, b) => Number(a.app_id) - Number(b.app_id))
-    Object.assign(deviceSettings, deviceSettingsRes.data || {})
+    Object.assign(deviceSettings, normalizeDeviceSettings(deviceSettingsRes.data || {}))
   } catch (e) {
     ElMessage.error('加载 OAuth 应用失败')
   }
@@ -232,7 +254,7 @@ function openEditDialog(row) {
   currentAppId.value = row.app_id
   form.client_name = row.client_name || ''
   form.redirect_uri = row.redirect_uri || ''
-  form.set_as_device_shared_client = !!row.is_device_shared_client
+  form.set_as_device_shared_client = isDeviceSharedClient(row.app_id)
   dialogVisible.value = true
 }
 
@@ -265,8 +287,14 @@ async function submitForm() {
 async function saveDeviceSettings() {
   savingDeviceSettings.value = true
   try {
-    const res = await axios.post('/admin/oauth/device-settings', deviceSettings, { headers: authHeaders() })
-    Object.assign(deviceSettings, res.data || {})
+    const payload = {
+      shared_client_ids: [...deviceSettings.shared_client_ids],
+      expires_in: deviceSettings.expires_in,
+      interval: deviceSettings.interval,
+      default_redirect_uri: deviceSettings.default_redirect_uri,
+    }
+    const res = await axios.post('/admin/oauth/device-settings', payload, { headers: authHeaders() })
+    Object.assign(deviceSettings, normalizeDeviceSettings(res.data || {}))
     await loadData()
     ElMessage.success('设备授权设置已保存')
   } catch (e) {
@@ -276,19 +304,24 @@ async function saveDeviceSettings() {
   }
 }
 
-async function setSharedClient(row) {
+async function toggleSharedClient(row) {
   try {
+    const nextSharedClientIds = isDeviceSharedClient(row.app_id)
+      ? deviceSettings.shared_client_ids.filter(item => Number(item) !== Number(row.app_id))
+      : [...deviceSettings.shared_client_ids, Number(row.app_id)]
     const res = await axios.post(
       '/admin/oauth/device-settings',
       {
-        ...deviceSettings,
-        shared_client_id: row.app_id,
+        shared_client_ids: [...new Set(nextSharedClientIds)],
+        expires_in: deviceSettings.expires_in,
+        interval: deviceSettings.interval,
+        default_redirect_uri: deviceSettings.default_redirect_uri,
       },
       { headers: authHeaders() },
     )
-    Object.assign(deviceSettings, res.data || {})
+    Object.assign(deviceSettings, normalizeDeviceSettings(res.data || {}))
     await loadData()
-    ElMessage.success(`AppID ${row.app_id} 已设为授权设备共享客户端`)
+    ElMessage.success(isDeviceSharedClient(row.app_id) ? `AppID ${row.app_id} 已加入设备授权列表` : `AppID ${row.app_id} 已移出设备授权列表`)
   } catch (e) {
     ElMessage.error(e.response?.data?.detail || '设置失败')
   }

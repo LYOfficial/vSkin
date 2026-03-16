@@ -70,6 +70,7 @@ class Config:
                 "access_token_expires_in": 7200,
                 "refresh_token_expires_in": 2592000,
                 "device": {
+                    "shared_client_ids": [],
                     "shared_client_id": "",
                     "expires_in": 900,
                     "interval": 5,
